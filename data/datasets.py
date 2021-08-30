@@ -53,6 +53,29 @@ voc_colormap = [
     [0, 64, 128],
 ]
 
+# transformation
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+#h,w = 520, 520
+#h,w = 256, 256 -> RandomCrop 224
+
+def get_transform(split, hw):
+    transform = None
+    h, w = hw, hw
+    if split == 'train':
+        transform = Compose([Resize((h,w)),
+                                   ToTensor(),
+                                    #RandomHorizontalFlip(p=0.5),
+                                    Normalize(mean, std)])
+    elif split == 'val':
+        transform = Compose([Resize((h,w)),
+                                ToTensor(),
+                                Normalize(mean, std)])
+    elif split == 'target':
+        transform = Compose([Resize((h,w))])
+                                   #ToTensor()])
+    return transform
+
 class VOCClassification(VOCDetection):
     def __init__(self, root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', download=False, transform=None):
         super().__init__(root=root, year=year, image_set=image_set, download=download, transform=transform)
