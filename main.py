@@ -1,5 +1,6 @@
 import argparse
 import os
+from data.classes import get_voc_class
 
 if __name__ == '__main__':
 
@@ -34,21 +35,33 @@ if __name__ == '__main__':
     parser.add_argument("--epoches", default=15, type=int)
     parser.add_argument("--learning_rate", default=0.1, type=float)
     parser.add_argument("--weight_decay", default=1e-4, type=float)
-    parser.add_argument("--eval_thres", default=0.15, type=float)
+    parser.add_argument("--eval_thres_start", default=0.05, type=float)
+    parser.add_argument("--eval_thres_limit", default=1., type=float)
+    parser.add_argument("--eval_thres_jump", default=0.05, type=float)
     #parser.add_argument("--cam_scales", default=(1.0, 0.5, 1.5, 2.0),
     #                    help="Multi-scale inferences") 
 
     # Step
     parser.add_argument("--finetune_skip", action="store_true")
+    parser.add_argument("--gen_cam_skip", action="store_true")
     parser.add_argument("--eval_cam_skip", action="store_true")
-    parser.add_argument("--save_cam", action="store_true",
-                        help="The flag which determines save cam before evaluation.")
+    #parser.add_argument("--save_cam", action="store_true",
+    #                    help="The flag which determines save cam before evaluation.")
 
     args = parser.parse_args()
 
     # Run
+    args.voc_class = get_voc_class()
+    args.voc_class_num = len(args.voc_class)
+    # finetuning
     if args.finetune_skip is not True:
-        pass
+        import finetune
+        finetune.run(args)
+    # generate cam
+    if args.gen_cam_skip is not True:
+        import gen_cam
+        gen_cam.run(args)
+    # evaluate cam
     if args.eval_cam_skip is not True:
         import eval_cam
         eval_cam.run(args)

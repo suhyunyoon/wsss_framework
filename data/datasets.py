@@ -1,6 +1,8 @@
 import torch
 from torchvision.datasets import VOCSegmentation, VOCDetection
 from torch.utils.data import DataLoader
+from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor
+import numpy as np
 
 # VOC class names
 voc_class = [
@@ -76,8 +78,19 @@ def get_transform(split, hw):
                                    #ToTensor()])
     return transform
 
+class VOCEvaluationCAM(VOCSegmentation):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, index):
+        img, seg = super().__getitem__(index)
+        #seg = torch.LongTensor(seg)
+        seg = np.array(seg, dtype=np.uint8)
+        return img, seg
+
+
 class VOCClassification(VOCDetection):
-    def __init__(self, root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', download=False, transform=None):
+    def __init__(self, root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', *args, **kwargs):
         super().__init__(root=root, year=year, image_set=image_set, download=download, transform=transform)
         self.voc_class = voc_class
         self.voc_class_num = voc_class_num

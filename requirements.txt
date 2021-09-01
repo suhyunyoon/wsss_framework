@@ -5,3 +5,4 @@ ttach
 tqdm
 chainercv
 grad-cam
+sklearn

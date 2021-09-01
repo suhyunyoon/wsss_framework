@@ -1,90 +1,84 @@
+# Use no GPUs
 import torch
-from torch import multiprocessing, cuda
-from torch.utils.data import DataLoader
-from torch.backends import cudnn
-
-from torchvision.datasets import VOCSegmentation
-
 import os
 import numpy as np
 from datetime import datetime
+import pickle
+import glob
+from tqdm import tqdm
 
-#from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM
-from pytorch_grad_cam import GradCAMPlusPlus
-from pytorch_grad_cam.utils.image import show_cam_on_image
+from chainercv.evaluations import calc_semantic_segmentation_confusion
+from data.classes import get_voc_class
 
-from model import get_model
-from data.dataset import get_transform
+def print_iou(iou):
+    voc_class = get_voc_class()
+    # miou
+    miou = np.nanmean(iou)
+    # print
+    for k, i in zip(voc_class, iou):
+        print('%-15s: %.6f' % (k,  i))
+    print('%-15s: %.6f' % ('miou', np.nanmean(iou)))
 
-cudnn.enabled = True
+# calculate iou and miou
+def calc_iou(pred, seg, verbose=False):
+    # calc confusion matrix
+    confusion = calc_semantic_segmentation_confusion(pred, seg)
 
-def _work(pid, model, dataset, args):
-    # split dataset
-    databin = dataset[pid]
-    n_gpus = torch.cuda.device_count()
-    # dataloader
-    dl = DataLoader(databin, shuffle=False, num_workers=args.num_workers // n_gpus, pin_memory=False)
-
-    with torch.no_grad(), cuda.device(pid):
-        model.cuda()
+    if verbose:
+        print(confusion.shape)
         
-        #
-        target_layer = None
+    # iou
+    gtj = confusion.sum(axis=1)
+    resj = confusion.sum(axis=0)
+    gtjresj = np.diag(confusion)
+    denominator = gtj + resj - gtjresj
+    iou = gtjresj / denominator
+    # miou
+    miou = np.nanmean(iou)
 
-        # Function which makes CAM
-        make_cam = GradCAMPlusPlus(model=model, target_layer=target_layer, use_cuda=True)
-        
-        # memorize label and predictions
-        segs=[]
-        preds=[]
-        for i in tqdm(range(len(dataset))):
-            pack = dataset[i]
-            img = pack[0].cuda()
-            seg = np.array(pack[1], dtype=np.uint8)
-            
-            # get image classes
-            label = np.unique(seg)
-            label = np.intersect1d(np.arange(voc_class_num-1), label)
-            
-            img = img.unsqueeze(0).repeat(len(label),1,1,1)
-            
-            pred_cam = make_cam(input_tensor=img, target_category=label)
-            
-            # Add background
-            label = np.pad(label+1, (1,0), mode='constant', constant_values=0)
-            pred_cam = np.pad(pred_cam, ((1,0),(0,0),(0,0)), mode='constant', constant_values=args.eval_thres)
-            pred = np.argmax(pred_cam, axis=0)
-            pred = label[pred]
-            
-            # Append
-            segs.append(seg)
-            preds.append(pred)
+    if verbose:
+        print_iou(iou)
 
+    return iou, miou
 
 def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Evaluating CAM...')
+   
+    # Evaluated thresholds
+    eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
+
+    # Evaluation
+    cam_list = glob.glob(os.path.join(args.cam_out_dir, '*'))
+    print(cam_list)
     
-    # Model
-    weights_path = os.path.join(args.weights_dir, args.network + '.pth') 
-    model, model_type = get_model(args.network, pretrained=False)
-    model.load_state_dict(torch.load(weights_path), strict=False)
-    model.eval()
-
-    # GPUs
-    n_gpus = torch.cuda.device_count()
-
-    # Dataset
-    transform_train = get_transform('train', args.crop_size)
-    transform_target = get_transform('target', args.crop_size)
-    dataset = VOCSegmentation(root=args.voc12_root, year='2012', image_set='train', downld=False, transform=transform_train, target_transform=transform_target)
-    # Split Dataset
-    dataset = torchutils.split_dataset(dataset, n_gpus)
-
-    # Multiprocessing
-    multiprocessing.spawn(_work, nprocs=n_gpus, args=(model, dataset, args), join=True)
-    torch.cuda.empty_cache()
+    segs, preds = {th:[] for th in eval_thres}, {th:[] for th in eval_thres}
+    # Read CAM files
+    print("Read CAM files...")
+    for path in cam_list:
+        with open(path, 'rb') as f:
+            res = pickle.load(f)
+        #print(len(res['segs']), res['segs'][0].shape)
+        for th in eval_thres:
+            segs[th] += res['segs_%d'%th]
+            preds[th] += res['preds_%d'%th]
+    
+    # Calc ious
+    ious, mious = [], []
+    print("Calculate ious...")
+    for th in tqdm(eval_thres):
+        iou, miou = calc_iou(preds[th], segs[th], verbose=False)
+        ious.append(iou)
+        mious.append(miou)
+    # Find Best thres
+    best_miou = max(mious)
+    best_idx = mious.index(best_miou)
+    best_thres = eval_thres[best_idx]
+    # Print Best mIoU
+    print('Best CAM threshold: %.4f'%best_thres)
+    print_iou(ious[best_idx])
 
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print('Evaluating CAM...')
+    print('Done Evaluating CAM.')
+    print()
 
