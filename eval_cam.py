@@ -49,25 +49,28 @@ def run(args):
     eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
 
     # Evaluation
-    cam_list = glob.glob(os.path.join(args.cam_out_dir, '*'))
+    cam_list = glob.glob(os.path.join(args.cam_out_dir, '{}_*.pickle'.format(args.network)))
+    #cam_path = os.path.join(args.cam_out_dir, 'cam_{}.pickle'.format(args.network))
     print(cam_list)
     
-    segs, preds = {th:[] for th in eval_thres}, {th:[] for th in eval_thres}
-    # Read CAM files
-    print("Read CAM files...")
-    for path in cam_list:
-        with open(path, 'rb') as f:
-            res = pickle.load(f)
+    # Read CAM
+    res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
+    for cam_path in cam_list:
+        # Read CAM files
+        print("Read CAM files...")
+        with open(cam_path, 'rb') as f:
+            r = pickle.load(f)
         #print(len(res['segs']), res['segs'][0].shape)
+        # concat
         for th in eval_thres:
-            segs[th] += res['segs_%d'%th]
-            preds[th] += res['preds_%d'%th]
-    
+            res['segs'][th] += r['segs'][th]
+            res['preds'][th] += r['preds'][th]
+
     # Calc ious
     ious, mious = [], []
     print("Calculate ious...")
     for th in tqdm(eval_thres):
-        iou, miou = calc_iou(preds[th], segs[th], verbose=False)
+        iou, miou = calc_iou(res['preds'][th], res['segs'][th], verbose=False)
         ious.append(iou)
         mious.append(miou)
     # Find Best thres

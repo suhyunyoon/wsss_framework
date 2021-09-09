@@ -66,17 +66,24 @@ def get_transform(split, hw):
     h, w = hw, hw
     if split == 'train':
         transform = Compose([Resize((h,w)),
-                                   ToTensor(),
-                                    #RandomHorizontalFlip(p=0.5),
-                                    Normalize(mean, std)])
+                            ToTensor(),
+                            #RandomHorizontalFlip(p=0.5),
+                            Normalize(mean, std)])
     elif split == 'val':
         transform = Compose([Resize((h,w)),
-                                ToTensor(),
-                                Normalize(mean, std)])
+                            ToTensor(),
+                            Normalize(mean, std)])
     elif split == 'target':
         transform = Compose([Resize((h,w))])
-                                   #ToTensor()])
+                            #ToTensor()])
     return transform
+
+def re_normalize(x, mean=mean, std=std):
+    x_r = x.clone()
+    for c, (mean_c, std_c) in enumerate(zip(mean,std)):
+        x_r[c] *= std_c
+        x_r[c] += mean_c
+    return x_r
 
 class VOCEvaluationCAM(VOCSegmentation):
     def __init__(self, *args, **kwargs):
@@ -90,8 +97,8 @@ class VOCEvaluationCAM(VOCSegmentation):
 
 
 class VOCClassification(VOCDetection):
-    def __init__(self, root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', *args, **kwargs):
-        super().__init__(root=root, year=year, image_set=image_set, download=download, transform=transform)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.voc_class = voc_class
         self.voc_class_num = voc_class_num
         self.voc_colormap = voc_colormap

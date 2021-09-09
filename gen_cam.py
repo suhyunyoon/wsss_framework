@@ -23,13 +23,12 @@ from torchutils._utils import split_dataset
 cudnn.enabled = True
 
 def _work(pid, model, dataset, args):
+    global res
     # split dataset
     databin = dataset[pid]
     n_gpus = torch.cuda.device_count()
     # dataloader
     dl = DataLoader(databin, shuffle=False, batch_size=1, num_workers=args.num_workers // n_gpus, pin_memory=False)
-
-    res = {}
     with cuda.device(pid):
         model.cuda()
         
@@ -38,45 +37,51 @@ def _work(pid, model, dataset, args):
 
         # Function which makes CAM
         make_cam = GradCAMPlusPlus(model=model, target_layer=target_layer, use_cuda=True)
-        # find best CAM threshold
+        # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
-        for th in tqdm(eval_thres):
-            # memorize label and predictions
-            segs=[]
-            preds=[]
+        res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
+        # Generate CAM
+        for img, seg in tqdm(dl):
+            img = img.cuda()
+            # squeeze & remove border
+            seg = np.squeeze(np.array(seg, dtype=np.uint8), axis=0)
+            seg[seg==255] = 0
+             
+            # get image classes(without background)
+            label = np.unique(seg)
+            label = np.intersect1d(np.arange(1, args.voc_class_num), label)
+            
             # Generate CAM
-            for img, seg in dl:
-                img = img.cuda()
-                # squeeze & remove border
-                seg = np.squeeze(np.array(seg, dtype=np.uint8), axis=0)
-                seg[seg==255] = 0
-                 
-                # get image classes(without background)
-                label = np.unique(seg)
-                label = np.intersect1d(np.arange(1, args.voc_class_num), label)
-                
-                # Generate CAM
-                img = img.repeat(len(label),1,1,1)
-                pred_cam = make_cam(input_tensor=img, target_category=label-1)
-                
-                # Add background
-                label = np.pad(label, (1,0), mode='constant', constant_values=0)
-                pred_cam = np.pad(pred_cam, ((1,0),(0,0),(0,0)), mode='constant', constant_values=th)
-                pred = np.argmax(pred_cam, axis=0)
+            img = img.repeat(len(label),1,1,1)
+            pred_cam = make_cam(input_tensor=img, target_category=label-1)
+            
+            # Add background
+            label = np.pad(label, (1,0), mode='constant', constant_values=0)
+
+            # Iter by thresholds
+            for th in eval_thres:
+                '''
+                # check key exists
+                if th not in res['segs']:
+                    res['segs'][th] = []
+                if th not in res['preds']:
+                    res['preds'][th] = []
+                '''
+                # Add background(CAM)
+                cam_th = np.pad(pred_cam, ((1,0),(0,0),(0,0)), mode='constant', constant_values=th)
+                pred = np.argmax(cam_th, axis=0)
                 pred = label[pred]
                 
                 # Append
-                segs.append(seg)
-                preds.append(pred)
-            # Save cam by thres
-            res['segs_%d' % th] = segs.copy()
-            res['preds_%d' % th] = preds.copy()
+                res['segs'][th].append(seg)
+                res['preds'][th].append(pred)
+
     # Save CAM
-    file_name = 'cam_{}.pickle'.format(pid)
+    file_name = '{}_{}.pickle'.format(args.network, pid)
     file_name = os.path.join(args.cam_out_dir, file_name)
     with open(file_name, 'wb') as f:
         pickle.dump(res, f)
-
+    
 def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Generating CAM...')

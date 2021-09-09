@@ -18,7 +18,9 @@ if __name__ == '__main__':
                         help="Path to Cityscapes dataset, must contain ./leftImg8bit or gtFine or gtCoarse are located.")
     parser.add_argument("--cityscapes_mode", default="fine", type=str, 
                         help="fine or coarse")
-    parser.add_argument("--eval_set", default="train", type=str,
+    # set
+    parser.add_argument("--train_set", default="train", type=str)
+    parser.add_argument("--eval_set", default="val", type=str,
                         help="voc12: train/test/val, cityscapes: train/train_extra(coarse mode)/val/test(fine mode)")
 
     # Output Path
@@ -29,7 +31,9 @@ if __name__ == '__main__':
 
     # Finetuning
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--network", default="resnet50", type=str)
+    parser.add_argument("--network", default="resnet50", type=str,
+                         choices=['resnet50', 'resnet101', 'resnet152', 'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
+                         'dino_xcit_small_12_p16', 'dino_xcit_small_12_p8', 'dino_xcit_medium_24_p16', 'dino_xcit_medium_24_p8'])
     parser.add_argument("--crop_size", default=224, type=int)
     parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--epoches", default=15, type=int)
@@ -38,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument("--eval_thres_start", default=0.05, type=float)
     parser.add_argument("--eval_thres_limit", default=1., type=float)
     parser.add_argument("--eval_thres_jump", default=0.05, type=float)
+    parser.add_argument("--verbose_interval", default=5, type=int)
     #parser.add_argument("--cam_scales", default=(1.0, 0.5, 1.5, 2.0),
     #                    help="Multi-scale inferences") 
 
