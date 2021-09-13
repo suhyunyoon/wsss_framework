@@ -1,171 +1,164 @@
 import torch
 from torch import nn, optim
+import os
 from tqdm import tqdm
+from datetime import datetime
 
 from data.classes import get_voc_class, get_voc_colormap, get_imagenet_class
 
 from torchvision.datasets import VOCSegmentation, VOCDetection
-from data.datasets import VOCClassification
+from data.datasets import VOCClassification, get_transform
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor 
 
-from model import get_model
+from model import get_model, Classifier
 
-if __name__=='__main__':
-    #sadfasdfasdfasdf
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score 
 
-    # Hyperparameters
-    seed = 42
-    batch_size = 32
-    num_workers = 8
-    epochs = 1
+# for evaluation
+#from sklearn.metrics import classification_report, multilabel_confusion_matrix
+def eval_multilabel_metric(label, logit, average="samples"):
+    pred = logit >= 0.5
 
-    # transformation
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-    #h,w = 520, 520
-    #h,w = 256, 256 -> RandomCrop 224
-    h,w = 224, 224
+    acc = accuracy_score(label, pred)
+    precision = precision_score(label, pred, average=average, zero_division=0)
+    recall = recall_score(label, pred, average=average)
+    f1 = f1_score(label, pred, average=average)
     
-    transform_train = Compose([Resize((h,w)),
-                               ToTensor(),
-                                #RandomHorizontalFlip(p=0.5),
-                                Normalize(mean, std)])
-    
-    transform_val = Compose([Resize((h,w)),
-                            ToTensor(),
-                            Normalize(mean, std)])
+    return acc, precision, recall, f1
 
-    transform_target = Compose([Resize((h,w))])
-                               #ToTensor()])
+# Validation in training
+def validate(model, dl, dataset, class_loss):
+    model.eval()
+    with torch.no_grad():
+        val_loss = 0.
+        logits = []
+        labels = []
+        for img, label in tqdm(dl):
+            # memorize labels
+            labels.append(label)
+            img, label = img.cuda(), label.cuda()
+            
+            # calc loss
+            logit = model(img)
+            loss = class_loss(logit, label).mean()
+            
+            # loss
+            val_loss += loss.detach().cpu()
+            # acc
+            logit = torch.sigmoid(logit).detach()
+            logits.append(logit)
+        # Eval
+        # loss
+        val_loss /= len(dataset)
+        # eval
+        logits = torch.cat(logits, dim=0).cpu()
+        labels = torch.cat(labels, dim=0)
+        acc, precision, recall, f1 = eval_multilabel_metric(labels, logits, average='samples')
+        print('Validation Loss: %.6f, Accuracy: %.6f, Precision: %.6f, Recall: %.6f, F1: %.6f' % (val_loss, acc, precision, recall, f1))
 
-    # Get dataset & dataloader
-    dataset_type = 'voc'
+    model.train()
     
-    if dataset_type == 'voc':
+
+def run(args):
+    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    print('Finetuning...')
+
+    # Count GPUs
+    n_gpus = torch.cuda.device_count()
+
+    # Dataset
+    # VOC2012
+    if args.dataset == 'voc12':
         voc_class = get_voc_class()
         voc_class_num = len(voc_class)
-        #dataset = VOCSegmentation(root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', download=False, transform=transform_train, target_transform=transform_target)
-        dataset = VOCClassification(root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', download=False, transform=transform_train)
+        # transform
+        transform_train = get_transform('train', args.crop_size)
+        transform_val = get_transform('val', args.crop_size)
+        # dataset
+        dataset_train = VOCClassification(root=args.voc12_root, year='2012', image_set=args.train_set, download=False, transform=transform_train)
+        dataset_val = VOCClassification(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_val)
+    # else
+    else:
+        pass
+    
+    # Dataloader
+    #train_sampler = DistributedSampler(dataset_train)
+    #val_sampler = DistributedSampler(dataset_val)
+    train_dl = DataLoader(dataset_train, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None)
+    val_dl = DataLoader(dataset_val, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None)
 
-    dl = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False, drop_last=True)
-
-
-    # Get Model
-    model_name = 'resnet50'
-    model_type = 'resnet'
-
-    model = get_model(model_name, pretrained=True)
-
-    # Switch FC layer
-    if model_type == 'resnet':
-        #in_features = model.fc.in_features
-        in_features = 2048
-        model.fc = nn.Linear(in_features, voc_class_num-1)
+    # Get Model + Switch FC layer
+    model, model_type = get_model(args.network, pretrained=True, classifier=True, class_num=voc_class_num-1)
 
     # Optimizer
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+    #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
     '''optimizer = PolyOptimizer([
         {'params': param_groups[0], 'lr': args.lr, 'weight_decay': args.wd},
         {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
         {'params': param_groups[2], 'lr': 10*args.lr, 'weight_decay': args.wd},
         {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
     ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)'''
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    if model_type == 'vits' or model_type == 'vitb':
+        optimizer = optim.AdamW(model.parameters(), lr=0.0005, weight_decay=0.04)
+    else:
+        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4, nesterov=True)
+ 
+    # model dataparallel
+    model = torch.nn.DataParallel(model).cuda()
+    # model DDP
+    # ...
+    #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
+    model.train()
 
-    # Training(Finetuning)
-    losses = []
-    accs = []
-
-    model.cuda()
-    for e in range(1, epochs+1):
+    # Training 
+    for e in range(1, args.epoches+1):
         model.train()
         train_loss = 0.
-        corrects = 0
-        for img, label in tqdm(dl):
+        logits = []
+        labels = []
+        for img, label in tqdm(train_dl):
+            # memorize labels
+            labels.append(label)
             img, label = img.cuda(), label.cuda()
-    
-            logits = model(img)
-    
-            loss = class_loss(logits, label).mean()
-    
+            
+            # calc loss
+            logit = model(img)
+        
+            loss = class_loss(logit, label).mean()
+            # training
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-    
-            # loss ,acc
+            
+            # loss
             train_loss += loss.detach().cpu()
-            corrects += (label == logits.detach()).sum()
-        train_loss /= len(dataset)
-        acc = corrects / len(dataset)
-        print('epoch %d Train Loss: %.6f, Accuracy: %.6f' % (e, train_loss, acc))
-        # Update loss, acc
-        losses.append(train_loss)
-        accs.append(acc)
-    print('Best Loss: %.6f' % min(losses))
-    print('Best Acc: %.6f' % max(accs))
+            # acc
+            logit = torch.sigmoid(logit).detach()
+            logits.append(logit)
 
-    # Evaluate CAM
-    from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    import numpy as np
+        # Training log
+        if e % args.verbose_interval != 0:
+            # loss
+            train_loss /= len(dataset_train)
+            # eval
+            logits = torch.cat(logits, dim=0).cpu()
+            labels = torch.cat(labels, dim=0) 
+            acc, precision, recall, f1 = eval_multilabel_metric(labels, logits, average='samples')
+            print('epoch %d Train Loss: %.6f, Accuracy: %.6f, Precision: %.6f, Recall: %.6f, F1: %.6f' % (e, train_loss, acc, precision, recall, f1))
 
-    model.eval()
-    # ResNet
-    if model_type == 'resnet':
-        target_layer = model.layer4[-1]
-    # EfficientNet
-    # ViT
-    # Swin
-    # ...
-        
-    # Function which makes CAM
-    make_cam = GradCAMPlusPlus(model=model, target_layer=target_layer, use_cuda=True)
+        # Validation
+        if e % args.verbose_interval == 0:
+            validate(model, val_dl, dataset_val, class_loss)
+    
+    # Save final model
+    weights_path = os.path.join(args.weights_dir, args.network + '.pth')
+    torch.save(model.state_dict(), weights_path)
+    torch.cuda.empty_cache()
 
-    # dataset
-    dataset = VOCSegmentation(root='/home/suhyun/dataset/VOC/', year='2012', image_set='train', download=False, transform=transform_train, target_transform=transform_target)
+    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    print('Done Finetuning.')
+    print()
 
-    # Make CAM
-    cam_eval_th = 0.15
-    
-    segs=[]
-    preds=[]
-    
-    for i in tqdm(range(len(dataset))):
-        pack = dataset[i]
-        img = pack[0].cuda()
-        seg = np.array(pack[1], dtype=np.uint8)
-    
-        # get image classes
-        label = np.unique(seg)
-        label = np.intersect1d(np.arange(voc_class_num-1), label)
-    
-        img = img.unsqueeze(0).repeat(len(label),1,1,1)
-    
-        pred_cam = make_cam(input_tensor=img, target_category=label)
-    
-        # Add background
-        label = np.pad(label+1, (1,0), mode='constant', constant_values=0)
-        pred_cam = np.pad(pred_cam, ((1,0),(0,0),(0,0)), mode='constant', constant_values=cam_eval_th)
-        pred = np.argmax(pred_cam, axis=0)
-        pred = label[pred]
-    
-        # Append
-        segs.append(seg)
-        preds.append(pred)
-
-    # Evaluate mIoU
-    from chainercv.evaluations import calc_semantic_segmentation_confusion
-    confusion = calc_semantic_segmentation_confusion(preds, segs)
-    
-    print(confusion.shape)
-    
-    gtj = confusion.sum(axis=1)
-    resj = confusion.sum(axis=0)
-    gtjresj = np.diag(confusion)
-    denominator = gtj + resj - gtjresj
-    iou = gtjresj / denominator
-    
-    for k, i in zip(voc_class, iou):
-        print('%-15s:' % k,  i)
-    print('%-15s:' % 'miou', np.nanmean(iou))

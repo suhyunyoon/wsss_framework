@@ -2,7 +2,9 @@ import torch
 from torchvision.datasets import VOCSegmentation, VOCDetection
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor
+
 import numpy as np
+import os
 
 # VOC class names
 voc_class = [
@@ -98,10 +100,32 @@ class VOCEvaluationCAM(VOCSegmentation):
 
 class VOCClassification(VOCDetection):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        # store image set before initialize
+        if kwargs['image_set'] == 'train_aug':
+            train_aug_flag = True
+            kwargs['image_set'] = 'train'
+        else:
+            train_aug_flag = False
+        # Init
+        super(VOCClassification, self).__init__(*args, **kwargs)
         self.voc_class = voc_class
         self.voc_class_num = voc_class_num
-        self.voc_colormap = voc_colormap
+        self.voc_colormap = voc_colormap 
+
+        # Replace trainset into train_aug  
+        if train_aug_flag:
+            self.image_set = 'train_aug'
+    
+            # directory initialization
+            image_dir = os.path.split(self.images[0])[0]
+            annotation_dir = os.path.join(os.path.dirname(image_dir), 'Annotations')
+
+            # read list of train_aug
+            with open('data/voc12/train_aug.txt', 'r') as f:
+            	train_aug = f.read().split()
+            # replace train into train_aug(images, annotations)
+            self.images = [os.path.join(image_dir, x + ".jpg") for x in train_aug]
+            self.annotations = [os.path.join(annotation_dir, x + ".xml") for x in train_aug]
 
     def __getitem__(self, index):
         img, ann = super().__getitem__(index)

@@ -19,9 +19,9 @@ if __name__ == '__main__':
     parser.add_argument("--cityscapes_mode", default="fine", type=str, 
                         help="fine or coarse")
     # set
-    parser.add_argument("--train_set", default="train", type=str)
+    parser.add_argument("--train_set", default="train_aug", type=str)
     parser.add_argument("--eval_set", default="val", type=str,
-                        help="voc12: train/test/val, cityscapes: train/train_extra(coarse mode)/val/test(fine mode)")
+                        help="voc12: train/val/trainval/train_aug, cityscapes: train/train_extra(coarse mode)/val/test(fine mode)")
 
     # Output Path
     #parser.add_argument("--log_name", default="sample_train_eval", type=str)
@@ -32,16 +32,18 @@ if __name__ == '__main__':
     # Finetuning
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--network", default="resnet50", type=str,
-                         choices=['resnet50', 'resnet101', 'resnet152', 'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
-                         'dino_xcit_small_12_p16', 'dino_xcit_small_12_p8', 'dino_xcit_medium_24_p16', 'dino_xcit_medium_24_p8'])
+                         choices=['resnet34', 'resnet50', 'resnet101', 'resnet152', 'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
+                         'dino_xcit_small_12_p16', 'dino_xcit_small_12_p8', 'dino_xcit_medium_24_p16', 'dino_xcit_medium_24_p8',
+                         'irn.net.resnet50_cam', 'irn.net.resnet50_irn'])
     parser.add_argument("--crop_size", default=224, type=int)
-    parser.add_argument("--batch_size", default=32, type=int)
-    parser.add_argument("--epoches", default=15, type=int)
+    parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument("--epoches", default=30, type=int)
     parser.add_argument("--learning_rate", default=0.1, type=float)
     parser.add_argument("--weight_decay", default=1e-4, type=float)
-    parser.add_argument("--eval_thres_start", default=0.05, type=float)
-    parser.add_argument("--eval_thres_limit", default=1., type=float)
-    parser.add_argument("--eval_thres_jump", default=0.05, type=float)
+    # percent(0~100%)
+    parser.add_argument("--eval_thres_start", default=5, type=float)
+    parser.add_argument("--eval_thres_limit", default=100, type=float)
+    parser.add_argument("--eval_thres_jump", default=5, type=float)
     parser.add_argument("--verbose_interval", default=5, type=int)
     #parser.add_argument("--cam_scales", default=(1.0, 0.5, 1.5, 2.0),
     #                    help="Multi-scale inferences") 
@@ -52,12 +54,15 @@ if __name__ == '__main__':
     parser.add_argument("--eval_cam_skip", action="store_true")
     #parser.add_argument("--save_cam", action="store_true",
     #                    help="The flag which determines save cam before evaluation.")
-
+    
+    # args
     args = parser.parse_args()
+    # voc12
+    if args.dataset == 'voc12':
+        args.voc_class = get_voc_class()
+        args.voc_class_num = len(args.voc_class)
 
-    # Run
-    args.voc_class = get_voc_class()
-    args.voc_class_num = len(args.voc_class)
+    # Run 
     # finetuning
     if args.finetune_skip is not True:
         import finetune
