@@ -92,6 +92,9 @@ def run(args):
     # Get Model + Switch FC layer
     model, model_type = get_model(args.network, pretrained=True, classifier=True, class_num=voc_class_num-1)
 
+    #weights_path = os.path.join(args.weights_dir, args.network + '.pth')
+    #model.load_state_dict(torch.load(weights_path), strict=False)
+
     # Optimizer
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
@@ -102,7 +105,9 @@ def run(args):
         {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
     ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)'''
     if model_type == 'vits' or model_type == 'vitb':
-        optimizer = optim.AdamW(model.parameters(), lr=0.0005, weight_decay=0.04)
+        optimizer = optim.AdamW(model.parameters(), lr=0.0003, weight_decay=0.04)
+    elif args.network == 'dino_resnet50':
+        optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=1e-4, nesterov=True)
     else:
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4, nesterov=True)
  
@@ -116,10 +121,12 @@ def run(args):
     # Training 
     for e in range(1, args.epoches+1):
         model.train()
+        
         train_loss = 0.
         logits = []
         labels = []
         for img, label in tqdm(train_dl):
+            
             # memorize labels
             labels.append(label)
             img, label = img.cuda(), label.cuda()
@@ -138,7 +145,7 @@ def run(args):
             # acc
             logit = torch.sigmoid(logit).detach()
             logits.append(logit)
-
+            
         # Training log
         if e % args.verbose_interval != 0:
             # loss
@@ -148,16 +155,17 @@ def run(args):
             labels = torch.cat(labels, dim=0) 
             acc, precision, recall, f1 = eval_multilabel_metric(labels, logits, average='samples')
             print('epoch %d Train Loss: %.6f, Accuracy: %.6f, Precision: %.6f, Recall: %.6f, F1: %.6f' % (e, train_loss, acc, precision, recall, f1))
-
+        
         # Validation
         if e % args.verbose_interval == 0:
             validate(model, val_dl, dataset_val, class_loss)
     
     # Save final model
     weights_path = os.path.join(args.weights_dir, args.network + '.pth')
-    torch.save(model.state_dict(), weights_path)
+    # split module from dataparallel
+    torch.save(model.module.state_dict(), weights_path)
     torch.cuda.empty_cache()
-
+    
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Finetuning.')
     print()
