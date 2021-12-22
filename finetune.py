@@ -92,8 +92,8 @@ def run(args):
     # Get Model + Switch FC layer
     model, model_type = get_model(args.network, pretrained=True, classifier=True, class_num=voc_class_num-1)
 
-    #weights_path = os.path.join(args.weights_dir, args.network + '.pth')
-    #model.load_state_dict(torch.load(weights_path), strict=False)
+    weights_path = os.path.join(args.weights_dir, args.network + '.pth')
+    model.load_state_dict(torch.load(weights_path), strict=True)
 
     # Optimizer
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
