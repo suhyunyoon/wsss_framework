@@ -4,40 +4,26 @@ from torch import nn
 import os
 import importlib
 
-from torchvision.models import resnet34, resnet50, resnet101, resnet152, resnext101_32x8d
+from models import resnet18, resnet34, resnet50, resnet101, resnet152
+from models import resnext50_32x4d, resnext101_32x8d
+from models import wide_resnet50_2, wide_resnet101_2
+from models import vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
 
 resnets = 'resnet'
+vggs = 'vgg'
+efficientnets = 'efficientnet'
 vits    = 'vits'
 vitb    = 'vitb'
 swin    = 'swin'
-# Eff
-# Swin
 # Deit
 # ...
 
 
 # Get model and architecture type(str)
 def get_model(model_name='resnet50', pretrained=False, classifier=False, class_num=1000):
-    # Supervised pretrained model
-    if model_name == 'resnet34':
-        model = resnet34(pretrained=pretrained)
-        model_type = resnets
-    elif model_name == 'resnet50':
-        model = resnet50(pretrained=pretrained)
-        model_type = resnets
-    elif model_name == 'resnet101':
-        model = resnet101(pretrained=pretrained)
-        model_type = resnets
-    elif model_name == 'resnet152':
-        model = resnet152(pretrained=pretrained)
-        model_type = resnets
-    elif model_name == 'resnet101_32x8d':
-        model = resnet101_32x8d(pretrained=pretrained)
-        model_type = resnets
-
     # Self-supervsied pretrained model
     # DINO
-    elif model_name == 'dino_vits16':
+    if model_name == 'dino_vits16':
         model = torch.hub.load('facebookresearch/dino:main', 'dino_vits16', pretrained=pretrained)
         model_type = vits
     elif model_name == 'dino_vits8':
@@ -49,13 +35,7 @@ def get_model(model_name='resnet50', pretrained=False, classifier=False, class_n
     elif model_name == 'dino_vitb8':
         model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb8', pretrained=pretrained)
         model_type = vitb
-
-    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_small_12_p16', pretrained=pretrained)
-    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_small_12_p8', pretrained=pretrained)
-    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p16', pretrained=pretrained)
-    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p8', pretrained=pretrained)
-    #model_type = 'xcit'
-
+    # SSL CNN
     elif model_name == 'dino_resnet50':
         model = torch.hub.load('facebookresearch/dino:main', 'dino_resnet50', pretrained=pretrained)
         model_type = resnets
@@ -72,11 +52,27 @@ def get_model(model_name='resnet50', pretrained=False, classifier=False, class_n
         if pretrained:
             model.load_state_dict(torch.load(model_name + '.pth'), strict=True)
         model_type = model_name_split[0] + '.' + resnets
+    # Scratch CNN models
+    # Supervised pretrained model
     else:
-        print('Model', model_name, 'Not Exists!')
-        model = None
-        model_type = ''
+        if model_name.startswith('resn') or model_name.startswith('wide_resnet'):
+            model_type = resnets
+        elif model_name.startswith('vgg'):
+            model_type = vggs
+        elif model_name.startswith('efficientnet'):
+            model_type = efficientnets
+        else:
+            print('Model', model_name, 'Not Exists!')
+            model = None
+        # Get model class by 
+        model = eval(model_name)(pretrained=pretrained)
 
+    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_small_12_p16', pretrained=pretrained)
+    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_small_12_p8', pretrained=pretrained)
+    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p16', pretrained=pretrained)
+    #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p8', pretrained=pretrained)
+    #model_type = 'xcit'
+    
     # return Classifier
     if classifier:
         model = Classifier(model, model_type, class_num)
@@ -89,6 +85,10 @@ def get_cam_target_layer(model, model_type):
     # from model.model where model is ./Classifier
     if model_type == resnets: 
         target_layer = model.layer4[-1] if hasattr(model,'layer4') else model.model.layer4[-1]
+    elif model_type == vggs:
+        target_layer = model.features[-1] if hasattr(model,'features') else model.model.features[-1]
+    elif model_type == efficientnets:
+        pass
     elif model_type == vits or model_type == vitb:
         target_layer = model.blocks[-1].norm1 if hasattr(model, 'blocks') else model.model.blocks[-1].norm1
     elif model_type == swin:
@@ -107,17 +107,30 @@ class Classifier(nn.Module):
         self.model_type = model_type
         # get backbone model
         self.model = model
+
         # remove existing linear
         if model_type == resnets:
             f_num = model.fc.in_features if hasattr(model.fc, 'in_features') else 2048
             model.fc = nn.Identity()
+        ############################
+        ### Wideresnet, Resnexts###
+        #############################
+        elif model_type == vggs:
+            f_num = model.classifier[-1].in_features if hasattr(model, 'classifier') else 1000
+            model.classifier[-1] = nn.Identity()
+
+        elif model_type == efficientnets:
+            f_num = -1
+
         elif model_type == vits or model_type == vitb:
             f_num = {vits: 384, vitb: 768}
             f_num = f_num[model_type]
             model.head = nn.Identity()
+
         elif model_type == swin:
             f_num = -1
             model.head = nn.Identity()
+
         # External models
         elif model_type == 'irn.'+resnets:
             f_num = -1

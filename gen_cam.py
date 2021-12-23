@@ -16,7 +16,7 @@ import glob
 from pytorch_grad_cam import GradCAMPlusPlus
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
-from model import get_model, get_cam_target_layer
+from models.utils import get_model, get_cam_target_layer
 from data.datasets import get_transform, VOCEvaluationCAM
 from torchutils._utils import split_dataset
 

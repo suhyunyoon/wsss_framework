@@ -32,7 +32,10 @@ if __name__ == '__main__':
     # Finetuning
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--network", default="resnet50", type=str,
-                         choices=['resnet34', 'resnet50', 'resnet101', 'resnet152', 'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
+                         choices=['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 
+                         'resnext50_32x4d', 'resnext101_32x8d', 'wide_resnet50_2', 'wide_resnet101_2',
+                         'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn', 'vgg19_bn',
+                         'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
                          'dino_xcit_small_12_p16', 'dino_xcit_small_12_p8', 'dino_xcit_medium_24_p16', 'dino_xcit_medium_24_p8',
                          'irn.net.resnet50_cam', 'irn.net.resnet50_irn'])
     parser.add_argument("--crop_size", default=224, type=int)

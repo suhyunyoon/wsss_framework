@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor 
 
-from model import get_model, Classifier
+from models.utils import get_model, Classifier
 
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score 
 
@@ -93,7 +93,7 @@ def run(args):
     model, model_type = get_model(args.network, pretrained=True, classifier=True, class_num=voc_class_num-1)
 
     weights_path = os.path.join(args.weights_dir, args.network + '.pth')
-    model.load_state_dict(torch.load(weights_path), strict=True)
+    #model.load_state_dict(torch.load(weights_path), strict=True)
 
     # Optimizer
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
