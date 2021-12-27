@@ -31,16 +31,18 @@ if __name__ == '__main__':
 
     # Finetuning
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--network", default="resnet50", type=str,
+    parser.add_argument("--network", default="resnet50", type=str)
+    '''
                          choices=['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 
                          'resnext50_32x4d', 'resnext101_32x8d', 'wide_resnet50_2', 'wide_resnet101_2',
                          'vgg11', 'vgg13', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg13_bn', 'vgg16_bn', 'vgg19_bn',
                          'dino_resnet50', 'dino_vits16', 'dino_vits8', 'dino_vitb16', 'dino_vitb8',
                          'dino_xcit_small_12_p16', 'dino_xcit_small_12_p8', 'dino_xcit_medium_24_p16', 'dino_xcit_medium_24_p8',
                          'irn.net.resnet50_cam', 'irn.net.resnet50_irn'])
+    '''
     parser.add_argument("--crop_size", default=224, type=int)
     parser.add_argument("--batch_size", default=64, type=int)
-    parser.add_argument("--epoches", default=30, type=int)
+    parser.add_argument("--epoches", default=100, type=int)
     parser.add_argument("--learning_rate", default=0.1, type=float)
     parser.add_argument("--weight_decay", default=1e-4, type=float)
     # percent(0~100%)
@@ -51,6 +53,10 @@ if __name__ == '__main__':
     #parser.add_argument("--cam_scales", default=(1.0, 0.5, 1.5, 2.0),
     #                    help="Multi-scale inferences") 
 
+    # Semi-supervsied
+    parser.add_argument("--labeled_ratio", default=1., type=float)
+    parser.add_argument("--use_unlabeled", action="store_true", help="Use unlabeled images after train_cam")
+    
     # Step
     parser.add_argument("--finetune_skip", action="store_true")
     parser.add_argument("--gen_cam_skip", action="store_true")
@@ -66,14 +72,21 @@ if __name__ == '__main__':
         args.voc_class_num = len(args.voc_class)
 
     # Run 
+    # split random labeled labels (for Semi-supervised)
+    if args.labeled_ratio < 1.:
+        import split_label
+        split_label.run(args)
+
     # finetuning
     if args.finetune_skip is not True:
         import finetune
         finetune.run(args)
+
     # generate cam
     if args.gen_cam_skip is not True:
         import gen_cam
         gen_cam.run(args)
+
     # evaluate cam
     if args.eval_cam_skip is not True:
         import eval_cam
