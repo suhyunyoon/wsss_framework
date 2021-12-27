@@ -244,9 +244,9 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.fc(x)
+        logit = self.fc(x)
 
-        return x
+        return logit
 
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
