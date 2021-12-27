@@ -17,7 +17,7 @@ from pytorch_grad_cam import GradCAMPlusPlus
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from models.utils import get_model, get_cam_target_layer
-from data.datasets import get_transform, VOCEvaluationCAM
+from data.datasets import get_transform, VOCSegmentationInt
 from torchutils._utils import split_dataset
 
 cudnn.enabled = True
@@ -79,7 +79,7 @@ def _work(pid, dataset, args):
 
         # Function which makes CAM
         target_tr = get_reshape_transform(args.network, model_type)
-        make_cam = GradCAMPlusPlus(model=model, target_layer=target_layer, use_cuda=True, reshape_transform=target_tr)
+        make_cam = GradCAMPlusPlus(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
         res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
@@ -134,7 +134,7 @@ def run(args):
     # Dataset
     transform_train = get_transform('train', args.crop_size)
     transform_target = get_transform('target', args.crop_size)
-    dataset = VOCEvaluationCAM(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_train, target_transform=transform_target)
+    dataset = VOCSegmentationInt(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_train, target_transform=transform_target)
     # Split Dataset
     dataset = split_dataset(dataset, n_gpus)
      

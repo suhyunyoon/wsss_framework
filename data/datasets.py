@@ -87,7 +87,7 @@ def re_normalize(x, mean=mean, std=std):
         x_r[c] += mean_c
     return x_r
 
-class VOCEvaluationCAM(VOCSegmentation):
+class VOCSegmentationInt(VOCSegmentation):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -110,7 +110,7 @@ class VOCClassification(VOCDetection):
         super(VOCClassification, self).__init__(*args, **kwargs)
         self.voc_class = voc_class
         self.voc_class_num = voc_class_num
-        self.voc_colormap = voc_colormap 
+        self.voc_colormap = voc_colormap
 
         # Replace trainset into train_aug  
         if train_aug_flag:
@@ -122,10 +122,16 @@ class VOCClassification(VOCDetection):
 
             # read list of train_aug
             with open('data/voc12/train_aug.txt', 'r') as f:
-            	train_aug = f.read().split()
+                train_aug = f.read().split()
             # replace train into train_aug(images, annotations)
             self.images = [os.path.join(image_dir, x + ".jpg") for x in train_aug]
-            self.annotations = [os.path.join(annotation_dir, x + ".xml") for x in train_aug]
+            
+            # deprecated(read-only property)
+            #self.annotations = [os.path.join(annotation_dir, x + ".xml") for x in train_aug]
+            # Re-append xml file list
+            self.annotations.clear()
+            for x in train_aug:
+                self.annotations.append(os.path.join(annotation_dir, x + ".xml"))
 
     def __getitem__(self, index):
         img, ann = super().__getitem__(index)

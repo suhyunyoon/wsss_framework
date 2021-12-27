@@ -79,6 +79,7 @@ def run(args):
         # dataset
         dataset_train = VOCClassification(root=args.voc12_root, year='2012', image_set=args.train_set, download=False, transform=transform_train)
         dataset_val = VOCClassification(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_val)
+
     # else
     else:
         pass
