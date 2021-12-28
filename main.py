@@ -42,7 +42,7 @@ if __name__ == '__main__':
     '''
     parser.add_argument("--crop_size", default=224, type=int)
     parser.add_argument("--batch_size", default=64, type=int)
-    parser.add_argument("--epoches", default=100, type=int)
+    parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--learning_rate", default=0.1, type=float)
     parser.add_argument("--weight_decay", default=1e-4, type=float)
     # percent(0~100%)
@@ -52,6 +52,10 @@ if __name__ == '__main__':
     parser.add_argument("--verbose_interval", default=5, type=int)
     #parser.add_argument("--cam_scales", default=(1.0, 0.5, 1.5, 2.0),
     #                    help="Multi-scale inferences") 
+    parser.add_argument("--weights_name", default=None, type=str, help="Model file name except directory. ex)resnet50_e150.pth")
+    parser.add_argument("--cam_type", default='gradcam', type=str,
+                        choices=['gradcam', 'gradcamplusplus', 'gradcam++', 'xgradcam', 'layercam',
+                        'ablationcam', 'scorecam', 'eigencam', 'eigengradcam', 'fullgrad'])
 
     # Semi-supervsied
     parser.add_argument("--labeled_ratio", default=1., type=float)

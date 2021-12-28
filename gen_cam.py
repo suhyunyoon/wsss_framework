@@ -1,6 +1,6 @@
 import torch
 from torch import multiprocessing, cuda
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.backends import cudnn
 
 #from torchvision.datasets import VOCSegmentation
@@ -12,13 +12,11 @@ from tqdm import tqdm
 import pickle
 import glob
 
-#from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM
-from pytorch_grad_cam import GradCAMPlusPlus
+from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, EigenGradCAM, ScoreCAM, FullGrad, LayerCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from models.utils import get_model, get_cam_target_layer
 from data.datasets import get_transform, VOCSegmentationInt
-from torchutils._utils import split_dataset
 
 cudnn.enabled = True
 
@@ -54,17 +52,42 @@ def get_reshape_transform(model_name, model_type=''):
 
 def _work(pid, dataset, args):
     # multiprocessing.spawn bug가 해결되면 run 함수로 옮기기
-    # Model
-    weights_path = os.path.join(args.weights_dir, args.network + '.pth') 
+    
+    # Find newest default model name
+    if args.weights_name is None:
+        model_names = glob.glob(os.path.join(args.weights_dir, args.network + '*'))
+        weights_path = max(model_names, key=os.path.getctime)
+    else:
+        weights_path = os.path.join(args.weights_dir, args.weights_name) 
+    # Load model
     model, model_type = get_model(args.network, pretrained=False, classifier=True, class_num=args.voc_class_num-1)
     
     #model = torch.nn.DataParallel(model)
-
     model.load_state_dict(torch.load(weights_path), strict=False)
-    
     #model = model.module
+
     model.eval() 
     args.model_type = model_type
+
+    # Select CAM
+    if args.cam_type == 'gradcam':
+        CAM = GradCAM
+    elif args.cam_type == 'gradcamplusplus' or args.cam_type == 'gradcam++':
+        CAM = GradCAMPlusPlus
+    elif args.cam_type == 'layercam':
+        CAM = LayerCAM
+    elif args.cam_type == 'scorecam':
+        CAM = ScoreCAM
+    elif args.cam_type == 'ablationCAM':
+        CAM = AblationCAM
+    elif args.cam_type == 'xgradcam':
+        CAM = XGradCAM
+    elif args.cam_type == 'eigencam':
+        CAM = EigenCAM
+    elif args.cam_type == 'eigengradcam':
+        CAM = EigenGradCAM
+    elif args.cam_type == 'fullgrad':
+        CAM = FullGrad
 
     # split dataset
     databin = dataset[pid]
@@ -79,7 +102,7 @@ def _work(pid, dataset, args):
 
         # Function which makes CAM
         target_tr = get_reshape_transform(args.network, model_type)
-        make_cam = GradCAMPlusPlus(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
+        make_cam = CAM(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
         res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
@@ -123,6 +146,9 @@ def _work(pid, dataset, args):
     file_name = os.path.join(args.cam_out_dir, file_name)
     with open(file_name, 'wb') as f:
         pickle.dump(res, f)
+
+    # clear gpu cache
+    torch.cuda.empty_cache()
     
 def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -136,7 +162,7 @@ def run(args):
     transform_target = get_transform('target', args.crop_size)
     dataset = VOCSegmentationInt(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_train, target_transform=transform_target)
     # Split Dataset
-    dataset = split_dataset(dataset, n_gpus)
+    dataset = [Subset(dataset, np.arange(i, len(dataset), n_gpus)) for i in range(n_gpus)]
      
     # Clean directory
     file_list = glob.glob(os.path.join(args.cam_out_dir, args.network+'*'))
@@ -146,7 +172,6 @@ def run(args):
     # Generate CAM with Multiprocessing  
     print('...')
     multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args), join=True)
-    torch.cuda.empty_cache()
 
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Generating CAM.')

@@ -120,7 +120,7 @@ def run(args):
     model.train()
 
     # Training 
-    for e in range(1, args.epoches+1):
+    for e in range(1, args.epochs+1):
         model.train()
         
         train_loss = 0.
@@ -162,7 +162,10 @@ def run(args):
             validate(model, val_dl, dataset_val, class_loss)
     
     # Save final model
-    weights_path = os.path.join(args.weights_dir, args.network + '.pth')
+    if args.weights_name is None:
+        weights_path = os.path.join(args.weights_dir, f'{args.network}_e{args.epochs}_b{args.batch_size}.pth')
+    else:
+        weights_path = os.path.join(args.weights_name, args.weights_name)
     # split module from dataparallel
     torch.save(model.module.state_dict(), weights_path)
     torch.cuda.empty_cache()
