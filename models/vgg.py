@@ -34,7 +34,7 @@ model_urls = {
 
 class VGG(nn.Module):
     def __init__(
-        self, features: nn.Module, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5
+        self, features: nn.Module, num_classes: int = 1000, init_weights: bool = True, dropout: float = 0.5,
     ) -> None:
         super().__init__()
         #_log_api_usage_once(self)
@@ -49,6 +49,7 @@ class VGG(nn.Module):
             nn.Dropout(p=dropout),
             nn.Linear(4096, num_classes),
         )
+
         if init_weights:
             self._initialize_weights()
 
@@ -98,13 +99,20 @@ cfgs: Dict[str, List[Union[str, int]]] = {
 }
 
 
-def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool, **kwargs: Any) -> VGG:
+def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool, single_classifier: bool = False, **kwargs: Any) -> VGG:
     if pretrained:
         kwargs["init_weights"] = False
     model = VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
         model.load_state_dict(state_dict)
+
+    # replace classifier into single linear layer
+    if single_classifier:
+        num_classes = kwargs.get('num_classes', 1000)
+        model.classifier = nn.Linear(512 * 7 * 7, num_classes)
+        nn.init.normal_(model.classifier.weight, 0, 0.01)
+        nn.init.constant_(model.classifier.bias, 0)
     return model
 
 
@@ -138,3 +146,12 @@ def vgg19(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG
 
 def vgg19_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
     return _vgg("vgg19_bn", "E", True, pretrained, progress, **kwargs)
+
+
+# Single Linear layer
+def vgg16_bn_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    return _vgg("vgg16_bn", "D", True, pretrained, progress, True, **kwargs)
+
+
+def vgg19_bn_single_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+    return _vgg("vgg19_bn", "E", True, pretrained, progress, True, **kwargs)
