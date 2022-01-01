@@ -7,7 +7,7 @@ import importlib
 from models import resnet18, resnet34, resnet50, resnet101, resnet152
 from models import resnext50_32x4d, resnext101_32x8d
 from models import wide_resnet50_2, wide_resnet101_2
-from models import vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn
+from models import vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn, vgg16_bn_sl, vgg19_bn_sl
 
 resnets = 'resnet'
 vggs = 'vgg'
@@ -153,3 +153,18 @@ class Classifier(nn.Module):
         x = self.fc(x)
         return x
 
+    def get_parameter_groups(self):
+        groups = ([], [], [], [])
+
+        for name, value in self.named_parameters():
+            if 'extra' in name or 'fc' in name:
+                if 'weight' in name:
+                    groups[2].append(value)
+                else:
+                    groups[3].append(value)
+            else:
+                if 'weight' in name:
+                    groups[0].append(value)
+                else:
+                    groups[1].append(value)
+        return groups

@@ -96,21 +96,43 @@ def run(args):
     weights_path = os.path.join(args.weights_dir, args.network + '.pth')
     #model.load_state_dict(torch.load(weights_path), strict=True)
 
-    # Optimizer
+    # Loss
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
-    '''optimizer = PolyOptimizer([
-        {'params': param_groups[0], 'lr': args.lr, 'weight_decay': args.wd},
-        {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
-        {'params': param_groups[2], 'lr': 10*args.lr, 'weight_decay': args.wd},
-        {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
-    ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)'''
+    
+    # Optimizer
     if model_type == 'vits' or model_type == 'vitb':
         optimizer = optim.AdamW(model.parameters(), lr=0.0003, weight_decay=0.04)
-    elif args.network == 'dino_resnet50':
-        optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    #elif args.network == 'dino_resnet50':
+    #    optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    # elif model_type == 'resnet':
+    #     param_groups = model.module.get_parameter_groups()
+    #     optimizer = optim.SGD([
+    #         {'params': param_groups[0], 'lr': args.lr},
+    #         {'params': param_groups[1], 'lr': 2*args.lr},
+    #         {'params': param_groups[2], 'lr': 10*args.lr},
+    #         {'params': param_groups[3], 'lr': 20*args.lr}], 
+    #         momentum=0.9, 
+    #         weight_decay=0.04, 
+    #         nesterov=True
+    #     )
+    # PolyOptimizer?
+    elif model_type == 'vgg':
+        param_groups = model.get_parameter_groups()
+        optimizer = optim.SGD([
+            {'params': param_groups[0], 'lr': args.learning_rate},
+            {'params': param_groups[1], 'lr': 2*args.learning_rate},
+            {'params': param_groups[2], 'lr': 10*args.learning_rate},
+            {'params': param_groups[3], 'lr': 20*args.learning_rate}], 
+            momentum=0.9, 
+            weight_decay=0.0005, 
+            nesterov=True
+        )
     else:
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4, nesterov=True)
+    
+    # Scheduler
+    ############
  
     # model dataparallel
     model = torch.nn.DataParallel(model).cuda()

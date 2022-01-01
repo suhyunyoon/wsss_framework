@@ -90,7 +90,6 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
             in_channels = v
     return nn.Sequential(*layers)
 
-
 cfgs: Dict[str, List[Union[str, int]]] = {
     "A": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "B": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
@@ -110,9 +109,11 @@ def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool
     # replace classifier into single linear layer
     if single_classifier:
         num_classes = kwargs.get('num_classes', 1000)
-        model.classifier = nn.Linear(512 * 7 * 7, num_classes)
-        nn.init.normal_(model.classifier.weight, 0, 0.01)
-        nn.init.constant_(model.classifier.bias, 0)
+
+        model.classifier = nn.Sequential(nn.Linear(512 * 7 * 7, num_classes))
+        nn.init.normal_(model.classifier[-1].weight, 0, 0.01)
+        nn.init.constant_(model.classifier[-1].bias, 0)
+
     return model
 
 
@@ -153,5 +154,5 @@ def vgg16_bn_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) 
     return _vgg("vgg16_bn", "D", True, pretrained, progress, True, **kwargs)
 
 
-def vgg19_bn_single_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
+def vgg19_bn_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
     return _vgg("vgg19_bn", "E", True, pretrained, progress, True, **kwargs)
