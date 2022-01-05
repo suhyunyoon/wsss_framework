@@ -78,20 +78,20 @@ if __name__ == '__main__':
     # Run 
     # split random labeled labels (for Semi-supervised)
     if args.labeled_ratio < 1.:
-        import split_label
-        split_label.run(args)
+        import step.split_label
+        step.split_label.run(args)
 
     # finetuning
     if args.finetune_skip is not True:
-        import finetune
-        finetune.run(args)
+        import step.finetune
+        step.finetune.run(args)
 
     # generate cam
     if args.gen_cam_skip is not True:
-        import gen_cam
-        gen_cam.run(args)
+        import step.gen_cam
+        step.gen_cam.run(args)
 
     # evaluate cam
     if args.eval_cam_skip is not True:
-        import eval_cam
-        eval_cam.run(args)
+        import step.eval_cam
+        step.eval_cam.run(args)
