@@ -127,7 +127,6 @@ def run(args):
     # model DDP
     # ...
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
-    model.train()
 
     # Training 
     for e in range(1, args.epochs+1):
@@ -144,6 +143,7 @@ def run(args):
             # calc loss
             logit = model(img)            
             loss = class_loss(logit, label).mean()
+
             # training
             optimizer.zero_grad()
             loss.backward()
@@ -152,8 +152,8 @@ def run(args):
             # loss
             train_loss += loss.detach().cpu()
             # acc
-            copied_logit = torch.sigmoid(logit).detach()
-            logits.append(copied_logit)
+            nth_logit = torch.sigmoid(logit).detach()
+            logits.append(nth_logit)
             
         # Training log
         if e % args.verbose_interval != 0:

@@ -1,18 +1,8 @@
 import torch
-from torch import nn
-
 import timm
 
 import os
 import importlib
-
-#from models import resnet18, resnet34, resnet50, resnet101, resnet152
-#from models import resnext50_32x4d, resnext101_32x8d
-#from models import wide_resnet50_2, wide_resnet101_2
-#from models import vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn, vgg19_bn, vgg16_bn_sl, vgg19_bn_sl
-# Deit
-# ...
-
 
 # Get model and architecture type(str)
 def get_model(model_name, pretrained=False, num_classes=1000):
@@ -28,28 +18,27 @@ def get_model(model_name, pretrained=False, num_classes=1000):
         # get pretrained path
         if pretrained:
             model.load_state_dict(torch.load(model_name + '.pth'), strict=True)
-    # ViT(Vision Transformer)
-    elif 'vit' in model_name:        
-        # Self-supervsied pretrained model DINO(vits,vitb)
-        if model_name.startswith('dino_'):
-            if model_name == 'dino_vits16':
-                model = timm.create_model('vit_small_patch16_224')(num_classes=num_classes)
-            elif model_name == 'dino_vits8':
-                model = timm.create_model('vit_small_patch8_224')(num_classes=num_classes)
-            elif model_name == 'dino_vitb16':
-                model = timm.create_model('vit_base_patch16_224')(num_classes=num_classes)
-            elif model_name == 'dino_vitb8':
-                model = timm.create_model('vit_base_patch8_224')(num_classes=num_classes)
+    # Self-supervsied pretrained model DINO(vits,vitb)
+    elif model_name.startswith('dino_'):
+        if model_name == 'dino_vits16':
+            model = timm.create_model('vit_small_patch16_224')(num_classes=num_classes)
+        elif model_name == 'dino_vits8':
+            model = timm.create_model('vit_small_patch8_224')(num_classes=num_classes)
+        elif model_name == 'dino_vitb16':
+            model = timm.create_model('vit_base_patch16_224')(num_classes=num_classes)
+        elif model_name == 'dino_vitb8':
+            model = timm.create_model('vit_base_patch8_224')(num_classes=num_classes)
+        elif model_name == 'dino_resnet50':
+            model = getattr(importlib.import_module('models'), 'resnet50')(pretrained=False, num_classes=num_classes)
 
-            pretrained = torch.hub.load('facebookresearch/dino:main', model_name)
-            model.load_state_dict(pretrained.state_dict(), strict=False)
-            # xcit 
-            #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p8', pretrained=pretrained)
-        
-        # Official timm vit
-        else:
-            model = timm.create_model(model_name)(pretrained=True, num_classes=num_classes)
+        pretrained = torch.hub.load('facebookresearch/dino:main', model_name)
+        model.load_state_dict(pretrained.state_dict(), strict=False)
+        # xcit 
+        #model = torch.hub.load('facebookresearch/dino:main', 'dino_xcit_medium_24_p8', pretrained=pretrained)
     
+    # ViT(Vision Transformer)
+    elif 'vit' in model_name:
+        model = timm.create_model(model_name)(pretrained=pretrained, num_classes=num_classes)
     
     # Scratch Supervised pretrained CNN models
     else:
