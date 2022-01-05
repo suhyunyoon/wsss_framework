@@ -39,7 +39,7 @@ def reshape_transform_14(tensor, height=14, width=14):
 def reshape_transform_28(tensor, height=28, width=28):
     return reshape_transform(tensor, height, width)
 
-def get_reshape_transform(model_name, model_type=''):
+def get_reshape_transform(model_name):
     if model_name in []:
         target_tr = reshape_transform_7
     elif model_name in ['dino_vits16', 'dino_vitb16', 'swin']:
@@ -60,14 +60,13 @@ def _work(pid, dataset, args):
     else:
         weights_path = os.path.join(args.weights_dir, args.weights_name) 
     # Load model
-    model, model_type = get_model(args.network, pretrained=False, classifier=True, class_num=args.voc_class_num-1)
+    model = get_model(args.network, pretrained=False, num_classes=args.voc_class_num-1)
     
     #model = torch.nn.DataParallel(model)
     model.load_state_dict(torch.load(weights_path), strict=False)
     #model = model.module
 
-    model.eval() 
-    args.model_type = model_type
+    model.eval()
 
     # Select CAM
     if args.cam_type == 'gradcam':
@@ -98,10 +97,10 @@ def _work(pid, dataset, args):
         model.cuda()
         
         # target layer
-        target_layer = get_cam_target_layer(model, args.model_type)
+        target_layer = get_cam_target_layer(args, model)
 
         # Function which makes CAM
-        target_tr = get_reshape_transform(args.network, model_type)
+        target_tr = get_reshape_transform(args.network)
         make_cam = CAM(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)

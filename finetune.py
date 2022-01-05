@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor 
 
-from models.utils import get_model, Classifier
+from models.utils import get_model
 
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score 
 
@@ -91,7 +91,7 @@ def run(args):
     val_dl = DataLoader(dataset_val, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None)
 
     # Get Model + Switch FC layer
-    model, model_type = get_model(args.network, pretrained=True, classifier=True, class_num=voc_class_num-1)
+    model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
 
     weights_path = os.path.join(args.weights_dir, args.network + '.pth')
     #model.load_state_dict(torch.load(weights_path), strict=True)
@@ -101,23 +101,12 @@ def run(args):
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
     
     # Optimizer
-    if model_type == 'vits' or model_type == 'vitb':
+    if 'vits' in args.network or 'vitb' in args.network:
         optimizer = optim.AdamW(model.parameters(), lr=0.0003, weight_decay=0.04)
     #elif args.network == 'dino_resnet50':
     #    optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=1e-4, nesterov=True)
-    # elif model_type == 'resnet':
-    #     param_groups = model.module.get_parameter_groups()
-    #     optimizer = optim.SGD([
-    #         {'params': param_groups[0], 'lr': args.lr},
-    #         {'params': param_groups[1], 'lr': 2*args.lr},
-    #         {'params': param_groups[2], 'lr': 10*args.lr},
-    #         {'params': param_groups[3], 'lr': 20*args.lr}], 
-    #         momentum=0.9, 
-    #         weight_decay=0.04, 
-    #         nesterov=True
-    #     )
     # PolyOptimizer?
-    elif model_type == 'vgg':
+    elif 'vgg' in args.network:
         param_groups = model.get_parameter_groups()
         optimizer = optim.SGD([
             {'params': param_groups[0], 'lr': args.learning_rate},
