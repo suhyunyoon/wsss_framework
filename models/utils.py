@@ -53,7 +53,7 @@ def get_model(model_name, pretrained=False, num_classes=1000):
     
     # Scratch Supervised pretrained CNN models
     else:
-        model = getattr(importlib.import_module('models'), model_name)(pretrained=pretrained)
+        model = getattr(importlib.import_module('models'), model_name)(pretrained=pretrained, num_classes=num_classes)
 
     return model
 
