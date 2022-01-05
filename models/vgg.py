@@ -54,13 +54,15 @@ class VGG(nn.Module):
             nn.Dropout(p=dropout),
             nn.Linear(4096, num_classes),
         )'''
-        self.extra_conv1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.extra_relu1 = nn.ReLU()
-        self.extra_conv2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.extra_relu2 = nn.ReLU(inplace=True)
-        self.extra_conv3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.extra_relu3 = nn.ReLU(inplace=True)
-        self.extra_conv4 = nn.Conv2d(512, 20, kernel_size=1)
+        self.extra = nn.Sequential(
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, num_classes, kernel_size=1)
+        )
 
         if init_weights:
             self._initialize_weights()
@@ -72,14 +74,8 @@ class VGG(nn.Module):
         x = torch.flatten(x, 1)
         logit = self.classifier(x)
         '''
-        # extra layer
-        x = self.extra_conv1(x)
-        x = self.extra_relu1(x)
-        x = self.extra_conv2(x)
-        x = self.extra_relu2(x)
-        x = self.extra_conv3(x)
-        x = self.extra_relu3(x)
-        x = self.extra_conv4(x)
+        # extra layers
+        x = self.extra(x)
         # classifier
         x = F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), padding=0)
         logit = x.view(-1, 20)
@@ -165,10 +161,13 @@ def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequ
 
 cfgs: Dict[str, List[Union[str, int]]] = {
     "A": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "A1": [64, "M", 128, "M", 256, 256, "M", 512, 512, "N", 512, 512],
     "B": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "B1": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "N", 512, 512],
     "D": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M", 512, 512, 512, "M"],
     "D1": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "N", 512, 512, 512],
     "E": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "M", 512, 512, 512, 512, "M"],
+    "E1": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "N", 512, 512, 512, 512],
 }
 
 
@@ -178,25 +177,25 @@ def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool
     model = VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
 
     return model
 
 
 def vgg11(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg11", "A", False, pretrained, progress, **kwargs)
+    return _vgg("vgg11", "A1", False, pretrained, progress, **kwargs)
 
 
 def vgg11_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg11_bn", "A", True, pretrained, progress, **kwargs)
+    return _vgg("vgg11_bn", "A1", True, pretrained, progress, **kwargs)
 
 
 def vgg13(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg13", "B", False, pretrained, progress, **kwargs)
+    return _vgg("vgg13", "B1", False, pretrained, progress, **kwargs)
 
 
 def vgg13_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg13_bn", "B", True, pretrained, progress, **kwargs)
+    return _vgg("vgg13_bn", "B1", True, pretrained, progress, **kwargs)
 
 
 # Main
@@ -205,12 +204,12 @@ def vgg16(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG
 
 
 def vgg16_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg16_bn", "D", True, pretrained, progress, **kwargs)
+    return _vgg("vgg16_bn", "D1", True, pretrained, progress, **kwargs)
 
 
 def vgg19(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg19", "E", False, pretrained, progress, **kwargs)
+    return _vgg("vgg19", "E1", False, pretrained, progress, **kwargs)
 
 
 def vgg19_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg19_bn", "E", True, pretrained, progress, **kwargs)
+    return _vgg("vgg19_bn", "E1", True, pretrained, progress, **kwargs)

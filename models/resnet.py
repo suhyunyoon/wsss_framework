@@ -1,5 +1,6 @@
 # Referenced https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
 from typing import Type, Any, Callable, Union, List, Optional
+import logging 
 
 import torch
 import torch.nn as nn
@@ -251,6 +252,22 @@ class ResNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
+    def on_load_checkpoint(self, checkpoint: dict) -> None:
+        state_dict = checkpoint
+        model_state_dict = self.state_dict()
+        is_changed = False
+        for k in state_dict:
+            if k in model_state_dict:
+                if state_dict[k].shape != model_state_dict[k].shape:
+                    logging.info(f"Skip loading parameter: {k}, "
+                                f"required shape: {model_state_dict[k].shape}, "
+                                f"loaded shape: {state_dict[k].shape}")
+                    state_dict[k] = model_state_dict[k]
+                    is_changed = True
+            else:
+                logging.info(f"Dropping parameter {k}")
+                is_changed = True
+
 
 def _resnet(
     arch: str,
@@ -261,9 +278,12 @@ def _resnet(
     **kwargs: Any,
 ) -> ResNet:
     model = ResNet(block, layers, **kwargs)
+
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
-        model.load_state_dict(state_dict)
+        #model.load_state_dict(state_dict, strict=False)
+        model.on_load_checkpoint(state_dict)
+        
     return model
     
 
