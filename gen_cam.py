@@ -147,7 +147,7 @@ def _work(pid, dataset, args):
         pickle.dump(res, f)
 
     # clear gpu cache
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
     
 def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -171,7 +171,8 @@ def run(args):
     # Generate CAM with Multiprocessing  
     print('...')
     multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args), join=True)
-
+    torch.cuda.empty_cache()
+    
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Generating CAM.')
     print()

@@ -87,12 +87,11 @@ def run(args):
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
     #val_sampler = DistributedSampler(dataset_val)
-    train_dl = DataLoader(dataset_train, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None)
-    val_dl = DataLoader(dataset_val, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None)
+    train_dl = DataLoader(dataset_train, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
+    val_dl = DataLoader(dataset_val, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
 
     # Get Model + Switch FC layer
     model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
-
     weights_path = os.path.join(args.weights_dir, args.network + '.pth')
     #model.load_state_dict(torch.load(weights_path), strict=True)
 
@@ -101,7 +100,7 @@ def run(args):
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
     
     # Optimizer
-    if 'vits' in args.network or 'vitb' in args.network:
+    if 'vit' in args.network:
         optimizer = optim.AdamW(model.parameters(), lr=0.0003, weight_decay=0.04)
     #elif args.network == 'dino_resnet50':
     #    optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=1e-4, nesterov=True)
@@ -138,14 +137,12 @@ def run(args):
         logits = []
         labels = []
         for img, label in tqdm(train_dl):
-            
             # memorize labels
             labels.append(label)
             img, label = img.cuda(), label.cuda()
             
             # calc loss
-            logit = model(img)
-        
+            logit = model(img)            
             loss = class_loss(logit, label).mean()
             # training
             optimizer.zero_grad()
@@ -155,8 +152,8 @@ def run(args):
             # loss
             train_loss += loss.detach().cpu()
             # acc
-            logit = torch.sigmoid(logit).detach()
-            logits.append(logit)
+            copied_logit = torch.sigmoid(logit).detach()
+            logits.append(copied_logit)
             
         # Training log
         if e % args.verbose_interval != 0:
@@ -179,9 +176,9 @@ def run(args):
         weights_path = os.path.join(args.weights_name, args.weights_name)
     # split module from dataparallel
     torch.save(model.module.state_dict(), weights_path)
-    torch.cuda.empty_cache()
     
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Finetuning.')
     print()
 
+    return None
