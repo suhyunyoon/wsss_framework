@@ -43,6 +43,7 @@ class VGG(nn.Module):
         super().__init__()
         #_log_api_usage_once(self)
         self.features = features
+        self.num_classes = num_classes
         '''
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
@@ -61,7 +62,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(512, 512, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(512, num_classes, kernel_size=1)
+            nn.Conv2d(512, self.num_classes, kernel_size=1)
         )
 
         if init_weights:
@@ -78,7 +79,7 @@ class VGG(nn.Module):
         x = self.extra(x)
         # classifier
         x = F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), padding=0)
-        logit = x.view(-1, 20)
+        logit = x.view(-1, self.num_classes)
 
         '''
         if label is None:
@@ -172,8 +173,8 @@ cfgs: Dict[str, List[Union[str, int]]] = {
 
 
 def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool, **kwargs: Any) -> VGG:
-    if pretrained:
-        kwargs["init_weights"] = False
+    #if pretrained:
+    kwargs["init_weights"] = True
     model = VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
@@ -204,7 +205,7 @@ def vgg16(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG
 
 
 def vgg16_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg16_bn", "D1", True, pretrained, progress, **kwargs)
+    return _vgg("vgg16_bn", "D", True, pretrained, progress, **kwargs)
 
 
 def vgg19(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:

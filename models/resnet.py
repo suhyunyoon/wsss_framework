@@ -179,6 +179,9 @@ class ResNet(nn.Module):
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+            #elif isinstance(m, nn.Linear):
+            #    nn.init.normal_(m.weight, 0, 0.01)
+            #    nn.init.constant_(m.bias, 0)
 
         # Zero-initialize the last BN in each residual branch,
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
@@ -252,21 +255,30 @@ class ResNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
-    def on_load_checkpoint(self, checkpoint: dict) -> None:
-        state_dict = checkpoint
+    # load_state_dict includes size mismatch
+    def on_load_checkpoint(self, state_dict, strict=True) -> None:
         model_state_dict = self.state_dict()
-        is_changed = False
+        pop_keys = []
         for k in state_dict:
             if k in model_state_dict:
                 if state_dict[k].shape != model_state_dict[k].shape:
-                    logging.info(f"Skip loading parameter: {k}, "
+                    print(f"Parameter size mismatch: {k}, "
                                 f"required shape: {model_state_dict[k].shape}, "
                                 f"loaded shape: {state_dict[k].shape}")
-                    state_dict[k] = model_state_dict[k]
-                    is_changed = True
+                    if strict:
+                        raise RuntimeError
+                    else:
+                        pop_keys.append(k)
             else:
-                logging.info(f"Dropping parameter {k}")
-                is_changed = True
+                print(f"Dropping parameter {k}")
+                if strict:
+                    raise RuntimeError
+                else:
+                    pop_keys.append(k)
+        for k in pop_keys:
+            state_dict.pop(k, None)
+
+        self.load_state_dict(state_dict, strict=False)
 
 
 def _resnet(
@@ -281,9 +293,10 @@ def _resnet(
 
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
-        #model.load_state_dict(state_dict, strict=False)
-        model.on_load_checkpoint(state_dict)
         
+        model.on_load_checkpoint(state_dict, strict=False)
+        #model.load_state_dict(state_dict, strict=True)
+
     return model
     
 
