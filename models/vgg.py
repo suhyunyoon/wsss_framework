@@ -1,7 +1,11 @@
+# Referenced https://github.com/pytorch/vision/blob/main/torchvision/models/vgg.py
+# Referenced https://github.com/qjadud1994/DRS/models/vgg.py
+import math
 from typing import Union, List, Dict, Any, cast
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from torch.hub import load_state_dict_from_url
 #from ..utils import _log_api_usage_once
@@ -39,6 +43,7 @@ class VGG(nn.Module):
         super().__init__()
         #_log_api_usage_once(self)
         self.features = features
+        '''
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, 4096),
@@ -48,22 +53,56 @@ class VGG(nn.Module):
             nn.ReLU(True),
             nn.Dropout(p=dropout),
             nn.Linear(4096, num_classes),
-        )
+        )'''
+        self.extra_conv1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.extra_relu1 = nn.ReLU()
+        self.extra_conv2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.extra_relu2 = nn.ReLU(inplace=True)
+        self.extra_conv3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.extra_relu3 = nn.ReLU(inplace=True)
+        self.extra_conv4 = nn.Conv2d(512, 20, kernel_size=1)
 
         if init_weights:
             self._initialize_weights()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
+        '''
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         logit = self.classifier(x)
+        '''
+        # extra layer
+        x = self.extra_conv1(x)
+        x = self.extra_relu1(x)
+        x = self.extra_conv2(x)
+        x = self.extra_relu2(x)
+        x = self.extra_conv3(x)
+        x = self.extra_relu3(x)
+        x = self.extra_conv4(x)
+        # classifier
+        x = F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), padding=0)
+        logit = x.view(-1, 20)
+
+        '''
+        if label is None:
+            # for training
+            return logit
+        
+        else:
+            # for validation
+            cam = self.cam_normalize(x.detach(), size, label)
+
+            return logit, cam
+        '''
         return logit
 
     def _initialize_weights(self) -> None:
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                #nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
@@ -73,46 +112,73 @@ class VGG(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
+    def cam_normalize(self, cam, size, label):
+        cam = F.relu(cam)
+        cam = F.interpolate(cam, size=size, mode='bilinear', align_corners=True)
+        cam /= F.adaptive_max_pool2d(cam, 1) + 1e-5
+        
+        cam = cam * label[:, :, None, None] # clean
+        
+        return cam
+
+    def get_parameter_groups(self):
+        groups = ([], [], [], [])
+
+        for name, value in self.named_parameters():
+
+            if 'extra' in name or 'fc' in name:
+                if 'weight' in name:
+                    groups[2].append(value)
+                else:
+                    groups[3].append(value)
+            else:
+                if 'weight' in name:
+                    groups[0].append(value)
+                else:
+                    groups[1].append(value)
+        return groups
+
 
 def make_layers(cfg: List[Union[str, int]], batch_norm: bool = False) -> nn.Sequential:
     layers: List[nn.Module] = []
     in_channels = 3
-    for v in cfg:
+    for i, v in enumerate(cfg):
         if v == "M":
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]   
+        elif v == 'N':
+            layers += [nn.MaxPool2d(kernel_size=3, stride=1, padding=1)]
         else:
+            # Conv
             v = cast(int, v)
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            if i > 13:
+                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, dilation=2, padding=2)
+            else:
+                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            # BN
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:
                 layers += [conv2d, nn.ReLU(inplace=True)]
             in_channels = v
+            
     return nn.Sequential(*layers)
 
 cfgs: Dict[str, List[Union[str, int]]] = {
     "A": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "B": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "D": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M", 512, 512, 512, "M"],
+    "D1": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "N", 512, 512, 512],
     "E": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "M", 512, 512, 512, 512, "M"],
 }
 
 
-def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool, single_classifier: bool = False, **kwargs: Any) -> VGG:
+def _vgg(arch: str, cfg: str, batch_norm: bool, pretrained: bool, progress: bool, **kwargs: Any) -> VGG:
     if pretrained:
         kwargs["init_weights"] = False
     model = VGG(make_layers(cfgs[cfg], batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
         model.load_state_dict(state_dict)
-
-    # replace classifier into single linear layer
-    if single_classifier:
-        num_classes = kwargs.get('num_classes', 1000)
-
-        model.classifier = nn.Sequential(nn.Linear(512 * 7 * 7, num_classes))
-        nn.init.normal_(model.classifier[-1].weight, 0, 0.01)
-        nn.init.constant_(model.classifier[-1].bias, 0)
 
     return model
 
@@ -133,8 +199,9 @@ def vgg13_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> 
     return _vgg("vgg13_bn", "B", True, pretrained, progress, **kwargs)
 
 
+# Main
 def vgg16(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg16", "D", False, pretrained, progress, **kwargs)
+    return _vgg("vgg16", "D1", False, pretrained, progress, **kwargs)
 
 
 def vgg16_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
@@ -147,12 +214,3 @@ def vgg19(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG
 
 def vgg19_bn(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
     return _vgg("vgg19_bn", "E", True, pretrained, progress, **kwargs)
-
-
-# Single Linear layer
-def vgg16_bn_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg16_bn", "D", True, pretrained, progress, True, **kwargs)
-
-
-def vgg19_bn_sl(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VGG:
-    return _vgg("vgg19_bn", "E", True, pretrained, progress, True, **kwargs)
