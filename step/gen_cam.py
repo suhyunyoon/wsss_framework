@@ -15,7 +15,7 @@ import glob
 from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, EigenGradCAM, ScoreCAM, FullGrad, LayerCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
-from models.utils import get_model, get_cam_target_layer
+from utils.models import get_model, get_cam_target_layer
 from data.datasets import get_transform, VOCSegmentationInt
 
 cudnn.enabled = True

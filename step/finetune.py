@@ -1,8 +1,10 @@
-import torch
-from torch import nn, optim
 import os
 from tqdm import tqdm
 from datetime import datetime
+import numpy as np
+
+import torch
+from torch import nn, optim
 
 from data.classes import get_voc_class, get_voc_colormap, get_imagenet_class
 
@@ -12,21 +14,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor 
 
-from models.utils import get_model
-
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score 
-
-# for evaluation
-#from sklearn.metrics import classification_report, multilabel_confusion_matrix
-def eval_multilabel_metric(label, logit, average="samples"):
-    pred = logit >= 0.5
-
-    acc = accuracy_score(label, pred)
-    precision = precision_score(label, pred, average=average, zero_division=0)
-    recall = recall_score(label, pred, average=average)
-    f1 = f1_score(label, pred, average=average)
-    
-    return acc, precision, recall, f1
+from utils.models import get_model
+from utils.metrics import eval_multilabel_metric
 
 # Validation in training
 def validate(model, dl, dataset, class_loss):
@@ -55,8 +44,8 @@ def validate(model, dl, dataset, class_loss):
         # eval
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0)
-        acc, precision, recall, f1 = eval_multilabel_metric(labels, logits, average='samples')
-        print('Validation Loss: %.6f, Accuracy: %.6f, Precision: %.6f, Recall: %.6f, F1: %.6f' % (val_loss, acc, precision, recall, f1))
+        acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
+        print('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, map, acc, precision, recall, f1))
 
     model.train()
     
@@ -124,6 +113,7 @@ def run(args):
  
     # model dataparallel
     model = torch.nn.DataParallel(model).cuda()
+    
     # model DDP
     # ...
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
@@ -156,14 +146,13 @@ def run(args):
             logits.append(nth_logit)
             
         # Training log
-        if e % args.verbose_interval != 0:
-            # loss
-            train_loss /= len(dataset_train)
-            # eval
-            logits = torch.cat(logits, dim=0).cpu()
-            labels = torch.cat(labels, dim=0) 
-            acc, precision, recall, f1 = eval_multilabel_metric(labels, logits, average='samples')
-            print('epoch %d Train Loss: %.6f, Accuracy: %.6f, Precision: %.6f, Recall: %.6f, F1: %.6f' % (e, train_loss, acc, precision, recall, f1))
+        # loss
+        train_loss /= len(dataset_train)
+        # eval
+        logits = torch.cat(logits, dim=0).cpu()
+        labels = torch.cat(labels, dim=0) 
+        acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
+        print('epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
         
         # Validation
         if e % args.verbose_interval == 0:
