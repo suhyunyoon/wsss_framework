@@ -1,0 +1,2 @@
+base: ./config/finetune/vgg.yml
+network: vgg16

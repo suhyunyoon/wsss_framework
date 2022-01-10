@@ -1,10 +1,8 @@
 # Copied from https://github.com/Alibaba-MIIL/ASL/blob/main/src/loss_functions/losses.py
 # https://github.com/Alibaba-MIIL/ASL
 
-
 import torch
 import torch.nn as nn
-
 
 class AsymmetricLoss(nn.Module):
     def __init__(self, gamma_neg=4, gamma_pos=1, clip=0.05, eps=1e-8, disable_torch_grad_focal_loss=True):
@@ -17,13 +15,6 @@ class AsymmetricLoss(nn.Module):
         self.eps = eps
 
     def forward(self, x, y):
-        """"
-        Parameters
-        ----------
-        x: input logits
-        y: targets (multi-label binarized vector)
-        """
-
         # Calculating Probabilities
         x_sigmoid = torch.sigmoid(x)
         xs_pos = x_sigmoid
@@ -55,9 +46,6 @@ class AsymmetricLoss(nn.Module):
 
 
 class AsymmetricLossOptimized(nn.Module):
-    ''' Notice - optimized version, minimizes memory allocation and gpu uploading,
-    favors inplace operations'''
-
     def __init__(self, gamma_neg=4, gamma_pos=1, clip=0.05, eps=1e-8, disable_torch_grad_focal_loss=False):
         super(AsymmetricLossOptimized, self).__init__()
 
@@ -71,13 +59,6 @@ class AsymmetricLossOptimized(nn.Module):
         self.targets = self.anti_targets = self.xs_pos = self.xs_neg = self.asymmetric_w = self.loss = None
 
     def forward(self, x, y):
-        """"
-        Parameters
-        ----------
-        x: input logits
-        y: targets (multi-label binarized vector)
-        """
-
         self.targets = y
         self.anti_targets = 1 - y
 
@@ -109,9 +90,6 @@ class AsymmetricLossOptimized(nn.Module):
 
 
 class ASLSingleLabel(nn.Module):
-    '''
-    This loss is intended for single-label classification problems
-    '''
     def __init__(self, gamma_pos=0, gamma_neg=4, eps: float = 0.1, reduction='mean'):
         super(ASLSingleLabel, self).__init__()
 
@@ -123,10 +101,6 @@ class ASLSingleLabel(nn.Module):
         self.reduction = reduction
 
     def forward(self, inputs, target):
-        '''
-        "input" dimensions: - (batch_size,number_classes)
-        "target" dimensions: - (batch_size)
-        '''
         num_classes = inputs.size()[-1]
         log_preds = self.logsoftmax(inputs)
         self.targets_classes = torch.zeros_like(inputs).scatter_(1, target.long().unsqueeze(1), 1)

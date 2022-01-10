@@ -1,7 +1,7 @@
 import os
 import random
 
-def run(args):
+def run(args, cfg):
     random.seed(args.seed)
 
     with open(args.train_list, 'r') as f:
