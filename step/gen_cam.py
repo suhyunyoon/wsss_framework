@@ -67,7 +67,7 @@ def _work(pid, dataset, args, cfg):
         model.cuda()
         
         # target layer
-        target_layer = get_cam_target_layer(args, model)
+        target_layer = get_cam_target_layer(model)
 
         # Function which makes CAM
         target_tr = get_reshape_transform(cfg['network'])
