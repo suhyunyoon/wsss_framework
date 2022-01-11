@@ -145,7 +145,10 @@ def run(args, cfg):
         # Validation
         if e % args.verbose_interval == 0:
             validate(model, val_dl, dataset_val, class_loss)
-    
+    # Final Validation
+    if e % args.verbose_interval != 0:
+        validate(model, val_dl, dataset_val, class_loss)
+
     # Save final model
     if args.weights_name is None:
         weights_path = os.path.join(args.weights_dir, f"{cfg['network']}_e{cfg['model']['epochs']}_b{cfg['model']['batch_size']}.pth")
