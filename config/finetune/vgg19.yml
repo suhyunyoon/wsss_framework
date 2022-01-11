@@ -1,2 +1,4 @@
 base: ./config/finetune/vgg.yml
 network: vgg19
+model:
+  epochs: 30

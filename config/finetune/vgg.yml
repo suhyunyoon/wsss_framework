@@ -16,5 +16,7 @@ scheduler:
     gamma: 0.1
 model:
   crop_size: 224
-  batch_size: 5
-  epochs: 15
+  # 5 or 8
+  batch_size: 8
+  # 15 or 25
+  epochs: 25
