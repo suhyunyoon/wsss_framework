@@ -1,0 +1,2 @@
+base: ./config/finetune/resnet.yml
+network: resnet50
