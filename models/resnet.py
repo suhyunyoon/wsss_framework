@@ -279,6 +279,17 @@ class ResNet(nn.Module):
             state_dict.pop(k, None)
 
         self.load_state_dict(state_dict, strict=False)
+    
+    def get_parameter_groups(self):
+        groups = ([], [])
+
+        for name, value in self.named_parameters():
+            if 'fc' in name:
+                groups[1].append(value)
+            else:
+                groups[0].append(value)
+
+        return groups
 
 
 def _resnet(

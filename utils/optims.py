@@ -43,15 +43,19 @@ def get_finetune_optimzier(cfg, model):
     # Load Optimizer method
     if hasattr(optim, cfg['optimizer']['name']):
         optim_method = getattr(optim, cfg['optimizer']['name'])
-    # scratch method
-    else:
-        optim_method = eval(optim, cfg['optimizer']['name'])
+    # scratch method (prevent injection)
+    elif '.' not in cfg['optimizer']['name'] and \
+         '(' not in cfg['optimizer']['name'] and \
+         ' ' not in cfg['optimizer']['name']:
+        optim_method = eval(cfg['optimizer']['name'])
 
     # Load Scheduler method
     if 'scheduler' in cfg:
         if hasattr(lr_scheduler, cfg['scheduler']['name']):
             scheduler_method = getattr(lr_scheduler, cfg['scheduler']['name'])
-        else:
+        elif '.' not in cfg['optimizer']['name'] and \
+            '(' not in cfg['optimizer']['name'] and \
+            ' ' not in cfg['optimizer']['name']:
             scheduler_method = eval(cfg['scheduler']['name'])
     else:
         scheduler_method = None
@@ -68,7 +72,14 @@ def get_finetune_optimzier(cfg, model):
 
     # ResNets
     elif ('resnet' in cfg['network']) or ('resnext' in cfg['network']) or ('res2net' in cfg['network']):
-        parameters = model.parameters()
+        if hasattr(model, 'get_parameter_groups'):
+            param_groups = model.get_parameter_groups()
+
+            parameters = [
+                {'params': param_groups[0], 'lr': 1 * cfg['optimizer']['kwargs']['lr'], 'weight_decay': cfg['optimizer']['kwargs']['weight_decay']},
+                {'params': param_groups[1], 'lr': 10 * cfg['optimizer']['kwargs']['lr'], 'weight_decay': cfg['optimizer']['kwargs']['weight_decay']}]
+        else:
+            parameters = model.parameters()
 
     # Dino_ResNet
     elif cfg['network'] == 'dino_resnet50':
