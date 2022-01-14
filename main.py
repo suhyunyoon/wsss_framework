@@ -1,6 +1,5 @@
 import argparse
 import os
-from datetime import datetime
 from data.classes import get_voc_class
 
 from utils.misc import load_config
@@ -101,23 +100,19 @@ if __name__ == '__main__':
     # Split random labeled labels (for Semi-supervised)
     if args.labeled_ratio < 1.:
         import step.split_label
-        print('Splitting Label: ', datetime.now())
         step.split_label.run(args, cfg)
 
     # Finetuning
     if args.finetune_skip is not True:
         import step.finetune
-        print('Finetuning: ', datetime.now())
         step.finetune.run(args, cfg)
 
     # Generate cam
     if args.gen_cam_skip is not True:
         import step.gen_cam
-        print('Generating CAM: ', datetime.now())
         step.gen_cam.run(args, cfg)
 
     # Evaluate cam
     if args.eval_cam_skip is not True:
         import step.eval_cam
-        print('Evaluting CAM: ', datetime.now())
         step.eval_cam.run(args, cfg)

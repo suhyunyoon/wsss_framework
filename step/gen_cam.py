@@ -21,8 +21,6 @@ from data.datasets import get_transform, VOCSegmentationInt
 cudnn.enabled = True
 
 def _work(pid, dataset, args, cfg):
-    # multiprocessing.spawn bug가 해결되면 run 함수로 옮기기
-    
     # Find newest default model name
     if args.weights_name is None:
         model_names = glob.glob(os.path.join(args.weights_dir, cfg['network'] + '*'))
@@ -64,7 +62,7 @@ def _work(pid, dataset, args, cfg):
     # dataloader
     dl = DataLoader(databin, shuffle=False, batch_size=1, num_workers=args.num_workers // n_gpus, pin_memory=False)
     with cuda.device(pid):
-        model.cuda()
+        model = model.cuda()
         
         # target layer
         target_layer = get_cam_target_layer(model)
@@ -109,6 +107,7 @@ def _work(pid, dataset, args, cfg):
                 # Append
                 res['segs'][th].append(seg)
                 res['preds'][th].append(pred)
+        print(img.device)
 
     # Save CAM
     file_name = '{}_{}.pickle'.format(cfg['network'], pid)
@@ -117,7 +116,7 @@ def _work(pid, dataset, args, cfg):
         pickle.dump(res, f)
 
     # clear gpu cache
-    #torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
     
 def run(args, cfg):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -142,7 +141,7 @@ def run(args, cfg):
     # Generate CAM with Multiprocessing  
     print('...')
     multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args, cfg), join=True)
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
     
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Generating CAM.')

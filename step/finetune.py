@@ -56,6 +56,13 @@ def run(args, cfg):
     # Count GPUs
     n_gpus = torch.cuda.device_count()
 
+    # Seed (reproducibility)
+    # import random
+    # random.seed(args.seed)
+    # torch.manual_seed(args.seed)
+    # np.random.seed(args.seed)
+    # cudnn.deterministic = True
+
     # Dataset
     # VOC2012
     if args.dataset == 'voc12':
