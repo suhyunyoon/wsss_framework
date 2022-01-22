@@ -38,55 +38,58 @@ def reduce_lr(epoch, optimizer, reduce_points, factor):
  
 
 # Return Optimizer and Scheduler
-def get_finetune_optimzier(cfg, model):
+def get_finetune_optimzier(args, model):
+    cfg_optim = args.cfg['optim']
+    cfg_sched = args.cfg['scheduler'] if 'scheduler' in args.cfg else None
 
     # Load Optimizer method
-    if hasattr(optim, cfg['optimizer']['name']):
-        optim_method = getattr(optim, cfg['optimizer']['name'])
+    if hasattr(optim, cfg_optim['name']):
+        optim_method = getattr(optim, cfg_optim['name'])
     # scratch method (prevent injection)
-    elif '.' not in cfg['optimizer']['name'] and \
-         '(' not in cfg['optimizer']['name'] and \
-         ' ' not in cfg['optimizer']['name']:
-        optim_method = eval(cfg['optimizer']['name'])
+    elif '.' not in cfg_optim['name'] and \
+         '(' not in cfg_optim['name'] and \
+         ' ' not in cfg_optim['name']:
+        optim_method = eval(cfg_optim['name'])
 
     # Load Scheduler method
-    if 'scheduler' in cfg:
-        if hasattr(lr_scheduler, cfg['scheduler']['name']):
-            scheduler_method = getattr(lr_scheduler, cfg['scheduler']['name'])
-        elif '.' not in cfg['optimizer']['name'] and \
-            '(' not in cfg['optimizer']['name'] and \
-            ' ' not in cfg['optimizer']['name']:
-            scheduler_method = eval(cfg['scheduler']['name'])
+    if cfg_sched:
+        if hasattr(lr_scheduler, cfg_sched['name']):
+            scheduler_method = getattr(lr_scheduler, cfg_sched['name'])
+        # for minimal security
+        elif '.' not in cfg_optim['name'] and \
+            '(' not in cfg_optim['name'] and \
+            ' ' not in cfg_optim['name']:
+            scheduler_method = eval(cfg_sched['name'])
     else:
         scheduler_method = None
 
     # VGGs
-    if cfg['network'].startswith('vgg'):
+    if args.cfg['name'].startswith('vgg'):
         param_groups = model.get_parameter_groups()
 
         parameters = [
-            {'params': param_groups[0], 'lr': 1 * cfg['optimizer']['lr']},
-            {'params': param_groups[1], 'lr': 2 * cfg['optimizer']['lr']},
-            {'params': param_groups[2], 'lr': 10 * cfg['optimizer']['lr']},
-            {'params': param_groups[3], 'lr': 20 * cfg['optimizer']['lr']}]
+            {'params': param_groups[0], 'lr': 1 * cfg_optim['lr']},
+            {'params': param_groups[1], 'lr': 2 * cfg_optim['lr']},
+            {'params': param_groups[2], 'lr': 10 * cfg_optim['lr']},
+            {'params': param_groups[3], 'lr': 20 * cfg_optim['lr']}]
 
     # ResNets
-    elif ('resnet' in cfg['network']) or ('resnext' in cfg['network']) or ('res2net' in cfg['network']):
+    elif ('resnet' in args.cfg['name']) or ('resnext' in args.cfg['name']) or ('res2net' in args.cfg['name']):
         if hasattr(model, 'get_parameter_groups'):
             param_groups = model.get_parameter_groups()
 
             parameters = [
-                {'params': param_groups[0], 'lr': 1 * cfg['optimizer']['kwargs']['lr'], 'weight_decay': cfg['optimizer']['kwargs']['weight_decay']},
-                {'params': param_groups[1], 'lr': 10 * cfg['optimizer']['kwargs']['lr'], 'weight_decay': cfg['optimizer']['kwargs']['weight_decay']}]
+                {'params': param_groups[0], 'lr': 1 * cfg_optim['kwargs']['lr'], 'weight_decay': cfg_optim['kwargs']['weight_decay']},
+                {'params': param_groups[1], 'lr': 10 * cfg_optim['kwargs']['lr'], 'weight_decay': cfg_optim['kwargs']['weight_decay']}]
         else:
             parameters = model.parameters()
 
     # Dino_ResNet
-    elif cfg['network'] == 'dino_resnet50':
+    elif args.cfg['name'] == 'dino_resnet50':
         parameters = model.parameters()
 
     # ViTs
-    elif cfg['network'].startwith('vit'):
+    elif args.cfg['name'].startwith('vit'):
         parameters = model.parameters()
 
     # Custom hparams
@@ -94,8 +97,8 @@ def get_finetune_optimzier(cfg, model):
         parameters = model.parameters()
 
     # Optimizer
-    optimizer = optim_method(parameters, **cfg['optimizer']['kwargs'])
+    optimizer = optim_method(parameters, **cfg_optim['kwargs'])
     # Scheduler
-    scheduler = scheduler_method(optimizer, **cfg['scheduler']['kwargs']) if scheduler_method else None
+    scheduler = scheduler_method(optimizer, **cfg_sched['kwargs']) if scheduler_method else None
 
     return optimizer, scheduler

@@ -1,0 +1,3 @@
+base: ./config/resnet.yml
+name: resnet50
+ 

@@ -20,15 +20,15 @@ from data.datasets import get_transform, VOCSegmentationInt
 
 cudnn.enabled = True
 
-def _work(pid, dataset, args, cfg):
+def _work(pid, dataset, args):
     # Find newest default model name
     if args.weights_name is None:
-        model_names = glob.glob(os.path.join(args.weights_dir, cfg['network'] + '*'))
+        model_names = glob.glob(os.path.join(args.weights_dir, args.cfg['name'] + '*'))
         weights_path = max(model_names, key=os.path.getctime)
     else:
         weights_path = os.path.join(args.weights_dir, args.weights_name) 
     # Load model
-    model = get_model(cfg['network'], pretrained=False, num_classes=args.voc_class_num-1)
+    model = get_model(args.cfg['name'], pretrained=False, num_classes=args.voc_class_num-1)
     
     #model = torch.nn.DataParallel(model)
     model.load_state_dict(torch.load(weights_path), strict=False)
@@ -68,7 +68,7 @@ def _work(pid, dataset, args, cfg):
         target_layer = get_cam_target_layer(model)
 
         # Function which makes CAM
-        target_tr = get_reshape_transform(cfg['network'])
+        target_tr = get_reshape_transform(args.cfg['name'])
         make_cam = CAM(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
@@ -107,10 +107,9 @@ def _work(pid, dataset, args, cfg):
                 # Append
                 res['segs'][th].append(seg)
                 res['preds'][th].append(pred)
-        print(img.device)
 
     # Save CAM
-    file_name = '{}_{}.pickle'.format(cfg['network'], pid)
+    file_name = '{}_{}.pickle'.format(args.cfg['name'], pid)
     file_name = os.path.join(args.cam_out_dir, file_name)
     with open(file_name, 'wb') as f:
         pickle.dump(res, f)
@@ -118,7 +117,7 @@ def _work(pid, dataset, args, cfg):
     # clear gpu cache
     torch.cuda.empty_cache()
     
-def run(args, cfg):
+def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Generating CAM...')
 
@@ -126,21 +125,21 @@ def run(args, cfg):
     n_gpus = torch.cuda.device_count()
 
     # Dataset
-    transform_train = get_transform('train', cfg['model']['crop_size'])
-    transform_target = get_transform('target', cfg['model']['crop_size'])
+    transform_train = get_transform('train', args.cfg['net']['crop_size'])
+    transform_target = get_transform('target', args.cfg['net']['crop_size'])
     dataset = VOCSegmentationInt(root=args.voc12_root, year='2012', image_set=args.eval_set, 
                                  download=False, transform=transform_train, target_transform=transform_target)
     # Split Dataset
     dataset = [Subset(dataset, np.arange(i, len(dataset), n_gpus)) for i in range(n_gpus)]
      
     # Clean directory
-    file_list = glob.glob(os.path.join(args.cam_out_dir, cfg['network']+'*'))
+    file_list = glob.glob(os.path.join(args.cam_out_dir, args.cfg['name']+'*'))
     for f in file_list:
         os.remove(f)
     
     # Generate CAM with Multiprocessing  
     print('...')
-    multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args, cfg), join=True)
+    multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args, args.cfg), join=True)
     #torch.cuda.empty_cache()
     
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))

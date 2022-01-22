@@ -41,7 +41,7 @@ def calc_iou(pred, seg, verbose=False):
 
     return iou, miou
 
-def run(args, cfg):
+def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Evaluating CAM...')
    

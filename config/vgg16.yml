@@ -1,0 +1,32 @@
+name: vgg16
+log_name: vgg16_voc12_1.0
+log_overwrite: False
+use_tensorboard: True
+distributed_multiprocessing: False
+distributed_backend: nccl
+gpu: None
+dataset: voc12
+dataset_root: ../../dataset/VOC/
+labeled_ratio: 1.0
+seed: 42
+net:
+  crop_size: 512
+  batch_size: 8
+  # 15 or 25
+  epochs: 25
+  # iteration 기준으로 바꿀거임
+optim:
+  name: SGD
+  lr: 0.001
+  kwargs:
+    momentum: 0.9
+    weight_decay: 0.0001
+    nesterov: True
+scheduler:
+  name: MultiStepLR
+  kwargs:
+    # LR decay points (list)
+    milestones:
+      - 5
+      - 10
+    gamma: 0.1

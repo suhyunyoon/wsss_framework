@@ -1,0 +1,16 @@
+name: base
+log_name: base_voc12_1.0
+log_overwrite: False
+use_tensorboard: True
+distributed_multiprocessing: False
+distributed_backend: nccl
+gpu: None
+labeled_ratio: 1.0
+net:
+  crop_size: 512
+  batch_size: 8
+  epochs: 20
+optim:
+  name: SGD
+  kwargs:
+    lr: 0.001

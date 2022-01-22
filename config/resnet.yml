@@ -1,6 +1,5 @@
-base: ./config/finetune/base.yml
-network: resnet
-optimizer:
+name: resnet
+optim:
   name: PolyOptimizer
   kwargs:
     lr: 0.1
@@ -8,6 +7,7 @@ optimizer:
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
     max_step: 22960
-model:
+net:
+  crop_size: 512
   batch_size: 16
   epochs: 35

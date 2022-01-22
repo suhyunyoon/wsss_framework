@@ -31,6 +31,7 @@ if __name__ == '__main__':
     # Paths
     #parser.add_argument("--log_name", default="sample_train_eval", type=str)
     parser.add_argument("--config_dir", default="config", type=str)
+    parser.add_argument("--log_dir", default="result", type=str)
     parser.add_argument("--weights_dir", default="result/weights", type=str)
     parser.add_argument("--cam_out_dir", default="result/cam", type=str)
     #parser.add_argument("--sem_seg_out_dir", default="result/sem_seg", type=str)
@@ -83,36 +84,44 @@ if __name__ == '__main__':
     #parser.add_argument("--save_cam", action="store_true",
     #                    help="The flag which determines save cam before evaluation.")
     
+    # Config
+    parser.add_argument('--c', type=str, default='config/base.yml')
+
     # args
     args = parser.parse_args()
+    
+    # Load config
+    args.cfg = load_config(args.c)
+    print('Loaded config file:', args.c)
+    print(args.cfg)
+
     # voc12
     if args.dataset == 'voc12':
         args.voc_class = get_voc_class()
-        args.voc_class_num = len(args.voc_class)
+        args.voc_class_num = len(args.voc_class)    
 
-    # Load config
-    cfg_path = os.path.join(args.config_dir, 'finetune', args.network+'.yml')
-    cfg = load_config(cfg_path)
-    print('Loaded config file:', cfg_path)
-    print(cfg)
+    # Make log directory
+    if not os.path.exists(args.log_dir):
+        import shutil
+        shutil.rmtree(args.log_dir)
 
     # Run 
     # Split random labeled labels (for Semi-supervised)
     if args.labeled_ratio < 1.:
         import step.split_label
-        step.split_label.run(args, cfg)
+        step.split_label.run(args)
 
     # Finetuning
     if args.finetune_skip is not True:
         import step.finetune
-        step.finetune.run(args, cfg)
+        step.finetune.run(args)
 
     # Generate cam
     if args.gen_cam_skip is not True:
         import step.gen_cam
-        step.gen_cam.run(args, cfg)
+        step.gen_cam.run(args)
 
     # Evaluate cam
     if args.eval_cam_skip is not True:
         import step.eval_cam
-        step.eval_cam.run(args, cfg)
+        step.eval_cam.run(args)

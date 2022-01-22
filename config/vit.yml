@@ -1,11 +1,11 @@
-network: base
-optimizer:
+name: vit
+optim:
   name: SGD
   kwargs:
     lr: 0.0003
     momentum: 0.9
     weight_decay: 0.04
-model:
+net:
   crop_size: 224
   batch_size: 16
   epochs: 250

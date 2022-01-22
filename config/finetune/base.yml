@@ -1,8 +1,0 @@
-optimizer:
-  name: SGD
-  kwargs:
-    lr: 0.001
-model:
-  crop_size: 512
-  batch_size: 8
-  epochs: 20

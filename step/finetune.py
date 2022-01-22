@@ -49,7 +49,7 @@ def validate(model, dl, dataset, class_loss):
     model.train()
     
 
-def run(args, cfg):
+def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Finetuning...')
 
@@ -69,8 +69,8 @@ def run(args, cfg):
         voc_class = get_voc_class()
         voc_class_num = len(voc_class)
         # transform
-        transform_train = get_transform('train', cfg['model']['crop_size'])
-        transform_val = get_transform('val', cfg['model']['crop_size'])
+        transform_train = get_transform('train', args.cfg['net']['crop_size'])
+        transform_val = get_transform('val', args.cfg['net']['crop_size'])
         # dataset
         dataset_train = VOCClassification(root=args.voc12_root, year='2012', image_set=args.train_set, download=False, transform=transform_train)
         dataset_val = VOCClassification(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_val)
@@ -86,12 +86,12 @@ def run(args, cfg):
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
     #val_sampler = DistributedSampler(dataset_val)
-    train_dl = DataLoader(dataset_train, batch_size=cfg['model']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
-    val_dl = DataLoader(dataset_val, batch_size=cfg['model']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
+    train_dl = DataLoader(dataset_train, batch_size=args.cfg['net']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
+    val_dl = DataLoader(dataset_val, batch_size=args.cfg['net']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
 
     # Get Model
-    model = get_model(cfg['network'], pretrained=True, num_classes=voc_class_num-1)
-    weights_path = os.path.join(args.weights_dir, cfg['network']+'.pth')
+    model = get_model(args.cfg['name'], pretrained=True, num_classes=voc_class_num-1)
+    weights_path = os.path.join(args.weights_dir, args.cfg['name']+'.pth')
     #model.load_state_dict(torch.load(weights_path), strict=True)
 
     # Load configuration
@@ -101,7 +101,7 @@ def run(args, cfg):
     #     cfg = vars(args)
     
     # Optimizer
-    optimizer, scheduler = get_finetune_optimzier(cfg, model)
+    optimizer, scheduler = get_finetune_optimzier(args, model)
  
     # model dataparallel
     model = torch.nn.DataParallel(model).cuda()
@@ -114,7 +114,7 @@ def run(args, cfg):
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
 
     # Training 
-    for e in range(1, cfg['model']['epochs']+1):
+    for e in range(1, args.cfg['net']['epochs']+1):
         model.train()
         
         train_loss = 0.
@@ -158,7 +158,7 @@ def run(args, cfg):
 
     # Save final model
     if args.weights_name is None:
-        weights_path = os.path.join(args.weights_dir, f"{cfg['network']}_e{cfg['model']['epochs']}_b{cfg['model']['batch_size']}.pth")
+        weights_path = os.path.join(args.weights_dir, f"{args.cfg['name']}_e{args.cfg['net']['epochs']}_b{args.cfg['net']['batch_size']}.pth")
     else:
         weights_path = os.path.join(args.weights_name, args.weights_name)
     # split module from dataparallel

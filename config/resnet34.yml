@@ -1,0 +1,21 @@
+base: ./config/resnet.yml
+name: resnet34
+log_name: resnet34_voc12_1.0
+log_overwrite: False
+use_tensorboard: True
+distributed_multiprocessing: False
+distributed_backend: nccl
+gpu: None
+labeled_ratio: 1.0
+net:
+  crop_size: 512
+  batch_size: 16
+  epochs: 3
+optim:
+  name: PolyOptimizer
+  kwargs:
+    lr: 0.1
+    momentum: 0.9
+    weight_decay: 0.0005
+    # (N(dataset) // batch_size) * epochs
+    max_step: 22960

@@ -6,5 +6,5 @@ tqdm
 chainercv
 grad-cam
 sklearn
-
+pyyaml
 timm
