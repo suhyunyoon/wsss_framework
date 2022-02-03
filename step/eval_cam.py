@@ -45,14 +45,17 @@ def run(args):
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Evaluating CAM...')
    
+    # set CAM directory path
+    args.log_path = os.path.join(args.log_dir, args.log_name)
+    args.cam_dir = os.path.join(args.log_path, 'cam')
+
+    # stored CAM file list
+    cam_list = glob.glob(os.path.join(args.cam_dir, '*.pickle'))
+    print(cam_list)
+
     # Evaluated thresholds
     eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
 
-    # Evaluation
-    cam_list = glob.glob(os.path.join(args.cam_out_dir, '{}_*.pickle'.format(args.network)))
-    #cam_path = os.path.join(args.cam_out_dir, 'cam_{}.pickle'.format(args.network))
-    print(cam_list)
-    
     # Read CAM
     res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
     for cam_path in cam_list:

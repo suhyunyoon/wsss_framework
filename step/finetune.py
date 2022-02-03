@@ -1,6 +1,7 @@
 import os
 from tqdm import tqdm
 from datetime import datetime
+import time
 
 import torch
 from torch import nn
@@ -47,6 +48,7 @@ def validate(model, dl, dataset, class_loss):
         print('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, map, acc, precision, recall, f1))
 
     model.train()
+    return val_loss, map, acc, precision, recall, f1
     
 
 def run(args):
@@ -69,12 +71,18 @@ def run(args):
         voc_class = get_voc_class()
         voc_class_num = len(voc_class)
         # transform
-        transform_train = get_transform('train', args.cfg['net']['crop_size'])
-        transform_val = get_transform('val', args.cfg['net']['crop_size'])
+        transform_train = get_transform('train', args.train['crop_size'])
+        transform_val = get_transform('val', args.eval['crop_size'])
         # dataset
-        dataset_train = VOCClassification(root=args.voc12_root, year='2012', image_set=args.train_set, download=False, transform=transform_train)
-        dataset_val = VOCClassification(root=args.voc12_root, year='2012', image_set=args.eval_set, download=False, transform=transform_val)
+        dataset_train = VOCClassification(root=args.dataset_root, year='2012', image_set='train', 
+                                            dataset_list=args.train_list, download=False, transform=transform_train)
+        dataset_val = VOCClassification(root=args.dataset_root, year='2012', image_set='val', 
+                                            dataset_list=args.eval_list, download=False, transform=transform_val)
         
+        # Unlabeled dataset
+        if args.labeled_ratio < 1.0:
+            pass
+
     # COCO2014
     elif args.dataset == 'coco':
         pass
@@ -86,26 +94,23 @@ def run(args):
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
     #val_sampler = DistributedSampler(dataset_val)
-    train_dl = DataLoader(dataset_train, batch_size=args.cfg['net']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
-    val_dl = DataLoader(dataset_val, batch_size=args.cfg['net']['batch_size'], num_workers=args.num_workers, shuffle=False, sampler=None, pin_memory=True)
+    train_dl = DataLoader(dataset_train, batch_size=args.train['batch_size'], num_workers=args.num_workers, 
+                            shuffle=True, sampler=None, pin_memory=True)
+    val_dl = DataLoader(dataset_val, batch_size=args.eval['batch_size'], num_workers=args.num_workers, 
+                            shuffle=False, sampler=None, pin_memory=True)
+    
+    # Unlabeled dataloader
+    if args.labeled_ratio < 1.0:
+        pass
 
     # Get Model
-    model = get_model(args.cfg['name'], pretrained=True, num_classes=voc_class_num-1)
-    weights_path = os.path.join(args.weights_dir, args.cfg['name']+'.pth')
-    #model.load_state_dict(torch.load(weights_path), strict=True)
-
-    # Load configuration
-    # if not args.custom_hp:
-    #     pass
-    # else:
-    #     cfg = vars(args)
+    model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
     
     # Optimizer
     optimizer, scheduler = get_finetune_optimzier(args, model)
  
     # model dataparallel
     model = torch.nn.DataParallel(model).cuda()
-    
     # model DDP(TBD)
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
 
@@ -113,8 +118,30 @@ def run(args):
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
 
+    # Logging dir
+    args.log_path = os.path.join(args.log_dir, args.log_name)
+    if os.path.exists(args.log_path):
+        # Overwrite existing dir
+        if args.log_overwrite:
+            import shutil
+            shutil.rmtree(args.log_path)
+            os.mkdir(args.log_path)
+
+        # Make another directory
+        else:
+            cur_time = str(int(time.time()))
+            args.log_path += '_' + cur_time
+            args.log_name += '_' +str(int(time.time()))
+    
+    else:
+        # Make log directory
+        os.mkdir(args.log_path)  
+        
+    print('Log Path:', args.log_path)
+
     # Training 
-    for e in range(1, args.cfg['net']['epochs']+1):
+    best_acc = 0.0
+    for e in range(1, args.train['epochs']+1):
         model.train()
         
         train_loss = 0.
@@ -151,18 +178,19 @@ def run(args):
         
         # Validation
         if e % args.verbose_interval == 0:
-            validate(model, val_dl, dataset_val, class_loss)
+            _, _, val_acc, _, _, _ = validate(model, val_dl, dataset_val, class_loss)
+            # Save Best Model
+            if val_acc >= best_acc:
+                torch.save(model.module.state_dict(), os.path.join(args.log_path, 'best.pth'))
+                best_acc = val_acc
+
     # Final Validation
     if e % args.verbose_interval != 0:
         validate(model, val_dl, dataset_val, class_loss)
 
-    # Save final model
-    if args.weights_name is None:
-        weights_path = os.path.join(args.weights_dir, f"{args.cfg['name']}_e{args.cfg['net']['epochs']}_b{args.cfg['net']['batch_size']}.pth")
-    else:
-        weights_path = os.path.join(args.weights_name, args.weights_name)
-    # split module from dataparallel
-    torch.save(model.module.state_dict(), weights_path)
+    # Save final model (split module from dataparallel)
+    final_model_path = os.path.join(args.log_path, 'final.pth')
+    torch.save(model.module.state_dict(), final_model_path)
     
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print('Done Finetuning.')

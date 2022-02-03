@@ -13,6 +13,7 @@ import pickle
 import glob
 
 from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, EigenGradCAM, ScoreCAM, FullGrad, LayerCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 #from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from utils.models import get_model, get_cam_target_layer, get_reshape_transform
@@ -21,19 +22,19 @@ from data.datasets import get_transform, VOCSegmentationInt
 cudnn.enabled = True
 
 def _work(pid, dataset, args):
-    # Find newest default model name
+
+    # Log path
     if args.weights_name is None:
-        model_names = glob.glob(os.path.join(args.weights_dir, args.cfg['name'] + '*'))
-        weights_path = max(model_names, key=os.path.getctime)
+        weights_path = os.path.join(args.log_path, 'final.pth')
     else:
-        weights_path = os.path.join(args.weights_dir, args.weights_name) 
+        weights_path = args.weights_name
+
     # Load model
-    model = get_model(args.cfg['name'], pretrained=False, num_classes=args.voc_class_num-1)
+    model = get_model(args.network, pretrained=False, num_classes=args.voc_class_num-1)
     
     #model = torch.nn.DataParallel(model)
     model.load_state_dict(torch.load(weights_path), strict=False)
     #model = model.module
-
     model.eval()
 
     # Select CAM
@@ -68,7 +69,7 @@ def _work(pid, dataset, args):
         target_layer = get_cam_target_layer(model)
 
         # Function which makes CAM
-        target_tr = get_reshape_transform(args.cfg['name'])
+        target_tr = get_reshape_transform(args.network)
         make_cam = CAM(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
@@ -82,12 +83,13 @@ def _work(pid, dataset, args):
              
             # get image classes(without background)
             label = np.unique(seg)
-            label = np.intersect1d(np.arange(1, args.voc_class_num), label)
+            label = np.intersect1d(np.arange(1, args.voc_class_num), label) - 1
+            targets = [ClassifierOutputTarget(i) for i in label]
             #print(label)
 
             # Generate CAM
             img = img.repeat(len(label),1,1,1)
-            pred_cam = make_cam(input_tensor=img, target_category=label-1)
+            pred_cam = make_cam(input_tensor=img, targets=targets)
             #print(pred_cam.shape) 
             #import matplotlib.pyplot as plt
             #for cam in pred_cam:
@@ -108,9 +110,7 @@ def _work(pid, dataset, args):
                 res['segs'][th].append(seg)
                 res['preds'][th].append(pred)
 
-    # Save CAM
-    file_name = '{}_{}.pickle'.format(args.cfg['name'], pid)
-    file_name = os.path.join(args.cam_out_dir, file_name)
+    file_name = os.path.join(args.cam_dir, f'{pid}.pickle')    
     with open(file_name, 'wb') as f:
         pickle.dump(res, f)
 
@@ -125,21 +125,30 @@ def run(args):
     n_gpus = torch.cuda.device_count()
 
     # Dataset
-    transform_train = get_transform('train', args.cfg['net']['crop_size'])
-    transform_target = get_transform('target', args.cfg['net']['crop_size'])
-    dataset = VOCSegmentationInt(root=args.voc12_root, year='2012', image_set=args.eval_set, 
+    transform_train = get_transform('val', args.eval['crop_size'])
+    transform_target = get_transform('target', args.eval['crop_size'])
+    dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='val', 
                                  download=False, transform=transform_train, target_transform=transform_target)
     # Split Dataset
     dataset = [Subset(dataset, np.arange(i, len(dataset), n_gpus)) for i in range(n_gpus)]
      
-    # Clean directory
-    file_list = glob.glob(os.path.join(args.cam_out_dir, args.cfg['name']+'*'))
+
+    # set Cam directory path
+    args.log_path = os.path.join(args.log_dir, args.log_name)
+    args.cam_dir = os.path.join(args.log_path, 'cam')
+
+    # Make dir
+    if not os.path.exists(args.cam_dir):
+        os.mkdir(args.cam_dir)
+    
+    # Clean existing CAMs
+    file_list = glob.glob(os.path.join(args.cam_dir, '*'))
     for f in file_list:
         os.remove(f)
     
     # Generate CAM with Multiprocessing  
     print('...')
-    multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args, args.cfg), join=True)
+    multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args), join=True)
     #torch.cuda.empty_cache()
     
     print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))

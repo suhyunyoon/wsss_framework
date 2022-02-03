@@ -2,7 +2,7 @@ import argparse
 import os
 from data.classes import get_voc_class
 
-from utils.misc import load_config
+from utils.misc import load_config, overwrite_args_from_yaml
 
 if __name__ == '__main__':
 
@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", default="voc12", choices=['voc12', 'coco', 'cityscapes'], type=str, 
                         help="Choose the dataset which to train.")
     # VOC
-    parser.add_argument("--voc12_root", default="../../dataset/VOC/", type=str,
+    parser.add_argument("--dataset_root", default="../../dataset/VOC/", type=str,
                         help="Path to VOC 2012 Devkit, must contain ./JPEGImages as subdirectory.")
     # COCO2014(TBD)
     # parser.add_argument("--coco_root", default="../../dataset/COCO", type=str,
@@ -24,13 +24,11 @@ if __name__ == '__main__':
     # parser.add_argument("--cityscapes_mode", default="fine", type=str, 
     #                     help="fine or coarse")
     # Dataset split
-    parser.add_argument("--train_set", default="train_aug", type=str)
-    parser.add_argument("--eval_set", default="val", type=str,
+    parser.add_argument("--train_list", default="./data/voc12/train_aug.txt", type=str)
+    parser.add_argument("--eval_list", default="./data/voc12/val.txt", type=str,
                         help="voc12: train/val/trainval/train_aug, cityscapes: train/train_extra(coarse mode)/val/test(fine mode)")
 
     # Paths
-    #parser.add_argument("--log_name", default="sample_train_eval", type=str)
-    parser.add_argument("--config_dir", default="config", type=str)
     parser.add_argument("--log_dir", default="result", type=str)
     parser.add_argument("--weights_dir", default="result/weights", type=str)
     parser.add_argument("--cam_out_dir", default="result/cam", type=str)
@@ -49,18 +47,6 @@ if __name__ == '__main__':
                          'irn.net.resnet50_cam', 'irn.net.resnet50_irn'])
     '''
     parser.add_argument("--verbose_interval", default=3, type=int)
-    parser.add_argument("--custom_hp", action="store_true", 
-                        help='''If custom_hp=True, use hparam values below.
-                                Use default yaml setting(Ignore hparams below) if custom_hp=False.''')
-    # parser.add_argument("--crop_size", default=224, type=int)
-    # parser.add_argument("--batch_size", default=64, type=int)
-    # parser.add_argument("--epochs", default=100, type=int)
-    # parser.add_argument("--lr", default=0.001, type=float, help="Learning Rate")
-    # parser.add_argument("--lr_reduce_point", default="5,10", type=str,
-    #                     help="Learning rate step. 0 means fix learning rate.(no reducing)")
-    # parser.add_argument("--lr_reduce_factor", default=0.1, type=float,
-    #                     help="Learing rate reduce factor.")
-    # parser.add_argument("--weight_decay", default=1e-4, type=float)
 
     # CAM background thresholding (percent(0~100%))
     parser.add_argument("--eval_thres_start", default=5, type=float)
@@ -75,7 +61,6 @@ if __name__ == '__main__':
 
     # Semi-supervsied
     parser.add_argument("--labeled_ratio", default=1., type=float)
-    parser.add_argument("--use_unlabeled", action="store_true", help="Use unlabeled images after train_cam")
     
     # Step
     parser.add_argument("--finetune_skip", action="store_true")
@@ -91,23 +76,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Load config
-    args.cfg = load_config(args.c)
-    print('Loaded config file:', args.c)
-    print(args.cfg)
-
+    overwrite_args_from_yaml(args, args.c)
+   
     # voc12
     if args.dataset == 'voc12':
         args.voc_class = get_voc_class()
-        args.voc_class_num = len(args.voc_class)    
+        args.voc_class_num = len(args.voc_class)
 
     # Make log directory
     if not os.path.exists(args.log_dir):
-        import shutil
-        shutil.rmtree(args.log_dir)
+        os.mkdir(args.log_dir)
 
     # Run 
-    # Split random labeled labels (for Semi-supervised)
-    if args.labeled_ratio < 1.:
+    # Split random labeled labels from train_list (for Semi-supervised)
+    if args.labeled_ratio < 1. and not args.train_ulb_list:
         import step.split_label
         step.split_label.run(args)
 

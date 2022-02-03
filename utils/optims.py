@@ -3,8 +3,9 @@ import numpy as np
 from torch import optim
 from torch.optim import lr_scheduler
 
-# Mostly Copied from https://github.com/jiwoon-ahn/irn/blob/master/misc/torchutils.py
+
 class PolyOptimizer(optim.SGD):
+    # Mostly Copied from https://github.com/jiwoon-ahn/irn/blob/master/misc/torchutils.py
     def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
         super().__init__(params, lr, weight_decay)
         self.param_groups = params
@@ -39,57 +40,54 @@ def reduce_lr(epoch, optimizer, reduce_points, factor):
 
 # Return Optimizer and Scheduler
 def get_finetune_optimzier(args, model):
-    cfg_optim = args.cfg['optim']
-    cfg_sched = args.cfg['scheduler'] if 'scheduler' in args.cfg else None
-
     # Load Optimizer method
-    if hasattr(optim, cfg_optim['name']):
-        optim_method = getattr(optim, cfg_optim['name'])
+    if hasattr(optim, args.optim['name']):
+        optim_method = getattr(optim, args.optim['name'])
     # scratch method (prevent injection)
-    elif '.' not in cfg_optim['name'] and \
-         '(' not in cfg_optim['name'] and \
-         ' ' not in cfg_optim['name']:
-        optim_method = eval(cfg_optim['name'])
+    elif '.' not in args.optim['name'] and \
+         '(' not in args.optim['name'] and \
+         ' ' not in args.optim['name']:
+        optim_method = eval(args.optim['name'])
 
     # Load Scheduler method
-    if cfg_sched:
-        if hasattr(lr_scheduler, cfg_sched['name']):
-            scheduler_method = getattr(lr_scheduler, cfg_sched['name'])
+    if hasattr(args, 'scheduler'):
+        if hasattr(lr_scheduler, args.scheduler['name']):
+            scheduler_method = getattr(lr_scheduler, args.scheduler['name'])
         # for minimal security
-        elif '.' not in cfg_optim['name'] and \
-            '(' not in cfg_optim['name'] and \
-            ' ' not in cfg_optim['name']:
-            scheduler_method = eval(cfg_sched['name'])
+        elif '.' not in args.optim['name'] and \
+            '(' not in args.optim['name'] and \
+            ' ' not in args.optim['name']:
+            scheduler_method = eval(args.scheduler['name'])
     else:
         scheduler_method = None
 
     # VGGs
-    if args.cfg['name'].startswith('vgg'):
+    if args.network.startswith('vgg'):
         param_groups = model.get_parameter_groups()
 
         parameters = [
-            {'params': param_groups[0], 'lr': 1 * cfg_optim['lr']},
-            {'params': param_groups[1], 'lr': 2 * cfg_optim['lr']},
-            {'params': param_groups[2], 'lr': 10 * cfg_optim['lr']},
-            {'params': param_groups[3], 'lr': 20 * cfg_optim['lr']}]
+            {'params': param_groups[0], 'lr': 1 * args.optim['lr']},
+            {'params': param_groups[1], 'lr': 2 * args.optim['lr']},
+            {'params': param_groups[2], 'lr': 10 * args.optim['lr']},
+            {'params': param_groups[3], 'lr': 20 * args.optim['lr']}]
 
     # ResNets
-    elif ('resnet' in args.cfg['name']) or ('resnext' in args.cfg['name']) or ('res2net' in args.cfg['name']):
+    elif ('resnet' in args.network) or ('resnext' in args.network) or ('res2net' in args.network):
         if hasattr(model, 'get_parameter_groups'):
             param_groups = model.get_parameter_groups()
 
             parameters = [
-                {'params': param_groups[0], 'lr': 1 * cfg_optim['kwargs']['lr'], 'weight_decay': cfg_optim['kwargs']['weight_decay']},
-                {'params': param_groups[1], 'lr': 10 * cfg_optim['kwargs']['lr'], 'weight_decay': cfg_optim['kwargs']['weight_decay']}]
+                {'params': param_groups[0], 'lr': 1 * args.optim['kwargs']['lr'], 'weight_decay': args.optim['kwargs']['weight_decay']},
+                {'params': param_groups[1], 'lr': 10 * args.optim['kwargs']['lr'], 'weight_decay': args.optim['kwargs']['weight_decay']}]
         else:
             parameters = model.parameters()
 
     # Dino_ResNet
-    elif args.cfg['name'] == 'dino_resnet50':
+    elif args.network == 'dino_resnet50':
         parameters = model.parameters()
 
     # ViTs
-    elif args.cfg['name'].startwith('vit'):
+    elif args.network.startwith('vit'):
         parameters = model.parameters()
 
     # Custom hparams
@@ -97,8 +95,8 @@ def get_finetune_optimzier(args, model):
         parameters = model.parameters()
 
     # Optimizer
-    optimizer = optim_method(parameters, **cfg_optim['kwargs'])
+    optimizer = optim_method(parameters, **args.optim['kwargs'])
     # Scheduler
-    scheduler = scheduler_method(optimizer, **cfg_sched['kwargs']) if scheduler_method else None
+    scheduler = scheduler_method(optimizer, **args.scheduler['kwargs']) if scheduler_method else None
 
     return optimizer, scheduler

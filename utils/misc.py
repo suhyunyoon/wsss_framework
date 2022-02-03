@@ -17,7 +17,6 @@ def inherit_dict(target, src):
     return ret
 
 # Load Configuration yaml file
-# cfg_path = os.path.join(args.config_dir, 'finetune', args.network+'.yml')
 def load_config(cfg_path):
 
     with open(cfg_path) as f:
@@ -29,3 +28,14 @@ def load_config(cfg_path):
         cfg = inherit_dict(cfg_parent, cfg)
     
     return cfg
+
+
+# Overwrite read config yaml file into args
+def overwrite_args_from_yaml(args, cfg_path):
+    if cfg_path == '':
+        return
+    with open(cfg_path, 'r', encoding='utf-8') as f:
+        dic = yaml.load(f.read(), Loader=yaml.Loader)
+        for k in dic:
+            setattr(args, k, dic[k])
+            

@@ -18,7 +18,7 @@ def run(args):
         f.write(new_list)
     
     # add new list
-    if args.use_unlabeled:
+    if args.labeled_ratio < 1.0:
         args.unlabeled_train_list = new_file
     else:
         args.train_list = new_file
@@ -32,11 +32,10 @@ if __name__=='__main__':
     parser.add_argument("--seed", default=42, type=int)
 
     # VOC12 Dataset
-    parser.add_argument("--train_list", default="voc12/train_aug.txt", type=str)
+    parser.add_argument("--train_list", default="data/voc12/train_aug.txt", type=str)
 
     # Step
     parser.add_argument("--labeled_ratio", default=1., type=float)
-    parser.add_argument("--use_unlabeled", action="store_true", help="Use unlabeled images after train_cam")
 
     args = parser.parse_args()
     
