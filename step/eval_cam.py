@@ -18,7 +18,7 @@ def print_iou(iou):
     # miou
     miou = np.nanmean(iou)
     # print
-    ret = ''
+    ret = '\n'
     for k, i in zip(voc_class, iou):
         ret += '%-15s: %.6f\n' % (k,  i)
     ret += '%-15s: %.6f' % ('miou', miou)
@@ -86,6 +86,5 @@ def run(args):
     logger.info('Best CAM threshold: %.4f'%best_thres)
     print_iou(ious[best_idx])
 
-    logger.info('Done Evaluating CAM.')
-    logger.info('\n')
+    logger.info('Done Evaluating CAM.\n')
 

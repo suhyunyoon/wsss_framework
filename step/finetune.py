@@ -154,7 +154,7 @@ def run(args):
         labels = torch.cat(labels, dim=0) 
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
         logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
-        logger.info(optimizer.state_dict)
+        #logger.info(optimizer.state_dict)
         # Validation
         if e % args.verbose_interval == 0:
             _, _, val_acc, _, _, _ = validate(model, val_dl, dataset_val, class_loss)
@@ -176,7 +176,6 @@ def run(args):
     final_model_path = os.path.join(args.log_path, 'final.pth')
     torch.save(model.module.state_dict(), final_model_path)
     
-    logger.info('Done Finetuning.')
-    logger.info('\n')
+    logger.info('Done Finetuning.\n')
 
     return None
