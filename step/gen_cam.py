@@ -86,8 +86,9 @@ def _work(pid, dataset, args):
              
             # get image classes(without background)
             label = np.unique(seg)
-            label = np.intersect1d(np.arange(1, args.voc_class_num), label) - 1
-            targets = [ClassifierOutputTarget(i) for i in label]
+            label = np.intersect1d(np.arange(1, args.voc_class_num), label)
+            targets = [ClassifierOutputTarget(i-1) for i in label]
+            #print(torch.sigmoid(model(img)), label)
 
             # Generate CAM
             img = img.repeat(len(label),1,1,1)
@@ -145,5 +146,4 @@ def run(args):
     multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args), join=True)
     #torch.cuda.empty_cache()
     
-    logger.info('Done Generating CAM.')
-    logger.info('\n')
+    logger.info('Done Generating CAM.\n')
