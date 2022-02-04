@@ -19,6 +19,13 @@ train:
   crop_size: 480
   batch_size: 16
   epochs: 35
+eval:
+  crop_size: 480
+  batch_size: 64
+  thres_start: 5
+  thres_limit: 100
+  thres_jump: 5
+  cam_type: gradcam
 optim:
   name: PolyOptimizer
   kwargs:
