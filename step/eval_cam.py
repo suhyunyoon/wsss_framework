@@ -29,9 +29,6 @@ def print_iou(iou):
 # calculate iou and miou
 def calc_iou(pred, seg):
     # calc confusion matrix
-    print(len(pred), len(seg))
-    for p, s in zip(pred, seg):
-        print(p.shape, s.shape)
     confusion = calc_semantic_segmentation_confusion(pred, seg)
 
     # iou
