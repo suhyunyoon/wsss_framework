@@ -70,14 +70,14 @@ def make_logger(args):
     logger.setLevel(logging.INFO)
     
     if args.finetune_skip:
-        args.log_path = os.path.join(args.log_dir, args.log_name)
+        log_path = os.path.join(args.log_dir, args.log_name)
     else:
-        args.log_path = make_log_dir(args)
+        log_path = make_log_dir(args)
 
     formatter = logging.Formatter(fmt="[%(asctime)s %(levelname)s] %(message)s")
 
     stream_handler = logging.StreamHandler()
-    file_handler = logging.FileHandler(filename=os.path.join(args.log_path, 'main.log'))  
+    file_handler = logging.FileHandler(filename=os.path.join(log_path, 'main.log'))  
 
     stream_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
@@ -88,7 +88,7 @@ def make_logger(args):
     #sys.stdout = LoggerWriter(logger.warning)
     #sys.stderr = LoggerWriter(logger.error)
     
-    return logger
+    return logger, log_path
     
 
 # class LoggerWriter:

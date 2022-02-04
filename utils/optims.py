@@ -39,10 +39,11 @@ def reduce_lr(epoch, optimizer, reduce_points, factor):
 
 # Return Optimizer and Scheduler
 def get_finetune_optimzier(args, model):
+
     # Load Optimizer method
     if hasattr(optim, args.optim['name']):
         optim_method = getattr(optim, args.optim['name'])
-    # scratch method (prevent injection)
+    # scratch method (prevent injection, for minimal security)
     elif '.' not in args.optim['name'] and \
          '(' not in args.optim['name'] and \
          ' ' not in args.optim['name']:
@@ -52,13 +53,14 @@ def get_finetune_optimzier(args, model):
     if hasattr(args, 'scheduler'):
         if hasattr(lr_scheduler, args.scheduler['name']):
             scheduler_method = getattr(lr_scheduler, args.scheduler['name'])
-        # for minimal security
+        # scratch method (prevent injection, for minimal security)
         elif '.' not in args.optim['name'] and \
             '(' not in args.optim['name'] and \
             ' ' not in args.optim['name']:
             scheduler_method = eval(args.scheduler['name'])
     else:
         scheduler_method = None
+
 
     # VGGs
     if args.network.startswith('vgg'):
@@ -68,7 +70,7 @@ def get_finetune_optimzier(args, model):
             {'params': param_groups[0], 'lr': 1 * args.optim['lr']},
             {'params': param_groups[1], 'lr': 2 * args.optim['lr']},
             {'params': param_groups[2], 'lr': 10 * args.optim['lr']},
-            {'params': param_groups[3], 'lr': 20 * args.optim['lr']}]
+            {'params': param_groups[3], 'lr': 20 * args.optim['lr']}] 
 
     # ResNets
     elif ('resnet' in args.network) or ('resnext' in args.network) or ('res2net' in args.network):
@@ -92,6 +94,7 @@ def get_finetune_optimzier(args, model):
     # Custom hparams
     else:
         parameters = model.parameters()
+
 
     # Optimizer
     optimizer = optim_method(parameters, **args.optim['kwargs'])

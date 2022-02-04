@@ -93,7 +93,7 @@ if __name__ == '__main__':
         os.mkdir(args.log_dir)
     
     # Logging
-    logger = make_logger(args)
+    logger, args.log_path = make_logger(args)
     logger.info(args)
     
     # Run 
