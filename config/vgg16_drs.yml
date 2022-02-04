@@ -14,12 +14,12 @@ train_ulb_list: False
 eval_list: ./data/voc12/val.txt
 verbose_interval: 3
 train:
-  input_size: 512
-  crop_size: 480
-  batch_size: 8
-  epochs: 25
+  input_size: 384
+  crop_size: 320
+  batch_size: 5
+  epochs: 15
 eval:
-  crop_size: 480
+  crop_size: 320
   batch_size: 64
   thres_start: 5
   thres_limit: 100
@@ -36,6 +36,6 @@ scheduler:
   name: MultiStepLR
   kwargs:
     milestones:
+      - 5
       - 10
-      - 18
     gamma: 0.1
