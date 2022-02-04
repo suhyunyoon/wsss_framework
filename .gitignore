@@ -3,6 +3,8 @@ __pycache__/
 *.ipynb
 *.pth
 *.swp
+*.out
+*.log
 
 external/*
 result/*

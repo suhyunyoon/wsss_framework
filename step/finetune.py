@@ -17,6 +17,9 @@ from utils.models import get_model
 from utils.optims import get_finetune_optimzier
 from utils.metrics import eval_multilabel_metric
 
+import logging
+logger = logging.getLogger('main')
+
 # Validation in training
 def validate(model, dl, dataset, class_loss):
     model.eval()
@@ -45,15 +48,14 @@ def validate(model, dl, dataset, class_loss):
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0)
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        print('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, map, acc, precision, recall, f1))
+        logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, map, acc, precision, recall, f1))
 
     model.train()
     return val_loss, map, acc, precision, recall, f1
     
 
 def run(args):
-    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print('Finetuning...')
+    logger.info('Finetuning...')
 
     # Count GPUs
     n_gpus = torch.cuda.device_count()
@@ -118,24 +120,6 @@ def run(args):
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
 
-    # Logging dir
-    args.log_path = os.path.join(args.log_dir, args.log_name)
-    if os.path.exists(args.log_path):
-        # Overwrite existing dir
-        if args.log_overwrite:
-            import shutil
-            shutil.rmtree(args.log_path)
-
-        # Make another directory
-        else:
-            cur_time = str(int(time.time()))
-            args.log_path += '_' + cur_time
-            args.log_name += '_' +str(int(time.time()))
-    # Make log directory
-    os.mkdir(args.log_path)  
-        
-    print('Log Path:', args.log_path)
-
     # Training 
     best_acc = 0.0
     for e in range(1, args.train['epochs']+1):
@@ -171,7 +155,7 @@ def run(args):
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0) 
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        print('epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
+        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
         
         # Validation
         if e % args.verbose_interval == 0:
@@ -194,8 +178,7 @@ def run(args):
     final_model_path = os.path.join(args.log_path, 'final.pth')
     torch.save(model.module.state_dict(), final_model_path)
     
-    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print('Done Finetuning.')
-    print()
+    logger.info('Done Finetuning.')
+    logger.info('\n')
 
     return None

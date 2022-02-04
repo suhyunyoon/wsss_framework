@@ -19,6 +19,9 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from utils.models import get_model, get_cam_target_layer, get_reshape_transform
 from data.datasets import get_transform, VOCSegmentationInt
 
+import logging
+logger = logging.getLogger('main')
+
 cudnn.enabled = True
 
 def _work(pid, dataset, args):
@@ -85,12 +88,10 @@ def _work(pid, dataset, args):
             label = np.unique(seg)
             label = np.intersect1d(np.arange(1, args.voc_class_num), label) - 1
             targets = [ClassifierOutputTarget(i) for i in label]
-            #print(label)
 
             # Generate CAM
             img = img.repeat(len(label),1,1,1)
             pred_cam = make_cam(input_tensor=img, targets=targets)
-            #print(pred_cam.shape) 
             #import matplotlib.pyplot as plt
             #for cam in pred_cam:
             #    plt.imshow(cam)
@@ -118,8 +119,7 @@ def _work(pid, dataset, args):
     torch.cuda.empty_cache()
     
 def run(args):
-    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print('Generating CAM...')
+    logger.info('Generating CAM...')
 
     # GPUs
     n_gpus = torch.cuda.device_count()
@@ -147,10 +147,8 @@ def run(args):
         os.remove(f)
     
     # Generate CAM with Multiprocessing  
-    print('...')
     multiprocessing.spawn(_work, nprocs=n_gpus, args=(dataset, args), join=True)
     #torch.cuda.empty_cache()
     
-    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    print('Done Generating CAM.')
-    print()
+    logger.info('Done Generating CAM.')
+    logger.info('\n')

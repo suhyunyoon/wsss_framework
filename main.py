@@ -2,7 +2,12 @@ import argparse
 import os
 from data.classes import get_voc_class
 
-from utils.misc import load_config, overwrite_args_from_yaml
+from utils.misc import load_config, overwrite_args_from_yaml, make_logger
+
+import traceback
+import warnings
+#import logging
+#logging.captureWarnings(True)
 
 if __name__ == '__main__':
 
@@ -86,24 +91,34 @@ if __name__ == '__main__':
     # Make log directory
     if not os.path.exists(args.log_dir):
         os.mkdir(args.log_dir)
-
+    
+    # Logging
+    logger = make_logger(args)
+    logger.info(args)
+    
     # Run 
-    # Split random labeled labels from train_list (for Semi-supervised)
-    if args.labeled_ratio < 1. and not args.train_ulb_list:
-        import step.split_label
-        step.split_label.run(args)
+    try:
+        with warnings.catch_warnings():
+            # Split random labeled labels from train_list (for Semi-supervised)
+            if args.labeled_ratio < 1. and not args.train_ulb_list:
+                import step.split_label
+                step.split_label.run(args)
 
-    # Finetuning
-    if args.finetune_skip is not True:
-        import step.finetune
-        step.finetune.run(args)
+            # Finetuning
+            if args.finetune_skip is not True:
+                import step.finetune
+                step.finetune.run(args)
 
-    # Generate cam
-    if args.gen_cam_skip is not True:
-        import step.gen_cam
-        step.gen_cam.run(args)
+            # Generate cam
+            if args.gen_cam_skip is not True:
+                import step.gen_cam
+                step.gen_cam.run(args)
 
-    # Evaluate cam
-    if args.eval_cam_skip is not True:
-        import step.eval_cam
-        step.eval_cam.run(args)
+            # Evaluate cam
+            if args.eval_cam_skip is not True:
+                import step.eval_cam
+                step.eval_cam.run(args)
+    
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        #raise e

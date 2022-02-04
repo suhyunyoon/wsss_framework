@@ -34,7 +34,6 @@ def reduce_lr(epoch, optimizer, reduce_points, factor):
     if change_points is not None and epoch in change_points:
         for g in optimizer.param_groups:
             g['lr'] = g['lr']*factor
-            print("Reduce Learning Rate : ", epoch, g['lr'])
         return True
  
 

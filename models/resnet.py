@@ -9,6 +9,8 @@ from torch import Tensor
 from torch.hub import load_state_dict_from_url
 #from ..utils import _log_api_usage_once
 
+logger = logging.getLogger('main')
+
 model_urls = {
     "resnet18": "https://download.pytorch.org/models/resnet18-f37072fd.pth",
     "resnet34": "https://download.pytorch.org/models/resnet34-b627a593.pth",
@@ -35,7 +37,7 @@ class BasicBlock(nn.Module):
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
     ) -> None:
-        super().__init__()
+        super().__init__() 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_width != 64:
@@ -262,7 +264,7 @@ class ResNet(nn.Module):
         for k in state_dict:
             if k in model_state_dict:
                 if state_dict[k].shape != model_state_dict[k].shape:
-                    print(f"Parameter size mismatch: {k}, "
+                    logger.warning(f"Parameter size mismatch: {k}, "
                                 f"required shape: {model_state_dict[k].shape}, "
                                 f"loaded shape: {state_dict[k].shape}")
                     if strict:
@@ -270,7 +272,7 @@ class ResNet(nn.Module):
                     else:
                         pop_keys.append(k)
             else:
-                print(f"Dropping parameter {k}")
+                logger.warning(f"Dropping parameter {k}")
                 if strict:
                     raise RuntimeError
                 else:
