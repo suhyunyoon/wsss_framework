@@ -13,11 +13,11 @@ import pickle
 import glob
 
 from pytorch_grad_cam import GradCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, EigenGradCAM, ScoreCAM, FullGrad, LayerCAM
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.model_targets import SemanticSegmentationTarget, ClassifierOutputTarget
 #from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from utils.models import get_model, get_cam_target_layer, get_reshape_transform
-from data.datasets import get_transform, VOCSegmentationInt
+from data.datasets import voc_train_dataset, voc_val_dataset
 
 import logging
 logger = logging.getLogger('main')
@@ -96,7 +96,7 @@ def _work(pid, dataset, args):
             #for cam in pred_cam:
             #    plt.imshow(cam)
             #    plt.show()
-
+            
             # Add background
             label = np.pad(label, (1,0), mode='constant', constant_values=0)
 
@@ -125,16 +125,11 @@ def run(args):
     n_gpus = torch.cuda.device_count()
 
     # Dataset
-    transform_train = get_transform('val', args.eval['crop_size'])
-    transform_target = get_transform('target', args.eval['crop_size'])
-    dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='val', 
-                                 download=False, transform=transform_train, target_transform=transform_target)
+    dataset = voc_val_dataset(args, args.eval_list, 'seg')
     # Split Dataset
     dataset = [Subset(dataset, np.arange(i, len(dataset), n_gpus)) for i in range(n_gpus)]
-     
 
     # set Cam directory path
-    args.log_path = os.path.join(args.log_dir, args.log_name)
     args.cam_dir = os.path.join(args.log_path, 'cam')
 
     # Make dir

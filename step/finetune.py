@@ -9,7 +9,7 @@ from torch import nn
 from data.classes import get_voc_class #, get_voc_colormap, get_imagenet_class
 
 # from torchvision.datasets import VOCSegmentation, VOCDetection
-from data.datasets import VOCClassification, get_transform
+from data.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
 from torch.utils.data import DataLoader
 # from torch.utils.data.distributed import DistributedSampler
 
@@ -72,38 +72,35 @@ def run(args):
     if args.dataset == 'voc12':
         voc_class = get_voc_class()
         voc_class_num = len(voc_class)
-        # transform
-        transform_train = get_transform('train', args.train['crop_size'])
-        transform_val = get_transform('val', args.eval['crop_size'])
+
         # dataset
-        dataset_train = VOCClassification(root=args.dataset_root, year='2012', image_set='train', 
-                                            dataset_list=args.train_list, download=False, transform=transform_train)
-        dataset_val = VOCClassification(root=args.dataset_root, year='2012', image_set='val', 
-                                            dataset_list=args.eval_list, download=False, transform=transform_val)
+        dataset_train = voc_train_dataset(args, args.train_list, 'cls')
+        dataset_val = voc_val_dataset(args, args.eval_list, 'cls')
         
         # Unlabeled dataset
-        if args.labeled_ratio < 1.0:
-            pass
+        if args.labeled_ratio < 1.0 or args.train_ulb_list:
+            dataset_train_ulb = voc_train_dataset(args, args.train_ulb_list, 'cls')
 
-    # COCO2014
-    elif args.dataset == 'coco':
-        pass
-
-    # Cityscapes
-    elif args.dataset == 'cityscapes':
-        pass
+    # # COCO2014
+    # elif args.dataset == 'coco':
+    #     pass
+    # # Cityscapes
+    # elif args.dataset == 'cityscapes':
+    #     pass
     
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
     #val_sampler = DistributedSampler(dataset_val)
     train_dl = DataLoader(dataset_train, batch_size=args.train['batch_size'], num_workers=args.num_workers, 
-                            shuffle=True, sampler=None, pin_memory=True)
+                          shuffle=True, sampler=None, pin_memory=True)
     val_dl = DataLoader(dataset_val, batch_size=args.eval['batch_size'], num_workers=args.num_workers, 
-                            shuffle=False, sampler=None, pin_memory=True)
+                        shuffle=False, sampler=None, pin_memory=True)
     
     # Unlabeled dataloader
-    if args.labeled_ratio < 1.0:
-        pass
+    if args.labeled_ratio < 1.0 or args.train_ulb_list:
+        train_ulb_dl = DataLoader(dataset_train_ulb, batch_size=args.train['batch_size'],
+                                  num_workers=args.num_workers, shuffle=True, sampler=None, pin_memory=True)
+
 
     # Get Model
     model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
@@ -119,6 +116,7 @@ def run(args):
     # Loss
     class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
     #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
+
 
     # Training 
     best_acc = 0.0
@@ -156,7 +154,7 @@ def run(args):
         labels = torch.cat(labels, dim=0) 
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
         logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
-        
+        logger.info(optimizer.state_dict)
         # Validation
         if e % args.verbose_interval == 0:
             _, _, val_acc, _, _, _ = validate(model, val_dl, dataset_val, class_loss)

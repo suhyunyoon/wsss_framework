@@ -1,7 +1,8 @@
 import torch
 from torchvision.datasets import VOCSegmentation, VOCDetection
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor
+from torchvision import transforms as tfs
+# from torchvision.transforms import Compose, Resize, RandomHorizontalFlip, Normalize, ToTensor
 
 import numpy as np
 import os
@@ -58,29 +59,80 @@ voc_colormap = [
 ]
 
 # transformation
-mean = [0.485, 0.456, 0.406]
-std = [0.229, 0.224, 0.225]
+voc_mean = [0.485, 0.456, 0.406]
+voc_std = [0.229, 0.224, 0.225]
 #h,w = 520, 520
 #h,w = 256, 256 -> RandomCrop 224
 
-def get_transform(split, hw):
-    transform = None
-    h, w = hw, hw
-    if split == 'train':
-        transform = Compose([Resize((h,w)),
-                            ToTensor(),
-                            #RandomHorizontalFlip(p=0.5),
-                            Normalize(mean, std)])
-    elif split == 'val':
-        transform = Compose([Resize((h,w)),
-                            ToTensor(),
-                            Normalize(mean, std)])
-    elif split == 'target':
-        transform = Compose([Resize((h,w))])
-                            #ToTensor()])
-    return transform
+def voc_train_dataset(args, img_list, mode='cls'):
+    tfs_train = tfs.Compose([tfs.Resize((args.train['input_size'], args.train['input_size'])),  
+                            tfs.RandomHorizontalFlip(),
+                            tfs.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+                            tfs.RandomCrop(args.train['crop_size']),
+                            tfs.ToTensor(),
+                            tfs.Normalize(voc_mean, voc_std),
+                            ])
+    tfs_target = tfs.Compose([tfs.Resize((args.train['crop_size'], args.train['crop_size']))])
 
-def re_normalize(x, mean=mean, std=std):
+    if mode == 'cls':
+        dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='train', 
+                                    dataset_list=img_list, download=False, transform=tfs_train)
+    elif mode == 'seg':
+        dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='train', 
+                                 download=False, transform=tfs_train, target_transform=tfs_target)
+
+    return dataset
+
+def voc_val_dataset(args, img_list, mode='cls'):
+    tfs_val = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size'])),  
+                            tfs.ToTensor(),
+                            tfs.Normalize(voc_mean, voc_std),
+                            ])
+    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))])
+
+    if mode == 'cls':
+        dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='val', 
+                                    dataset_list=img_list, download=False, transform=tfs_val)
+    elif mode == 'seg':
+        dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='val',
+                                 download=False, transform=tfs_val, target_transform=tfs_target)
+    return dataset
+
+def voc_test_dataset(args, img_list, mode='cls'):
+    tfs_test = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size'])),
+                            tfs.ToTensor(),
+                            tfs.Normalize(voc_mean, voc_std),
+                            ])
+    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))])
+
+    if mode == 'cls':
+        dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='test', 
+                                    dataset_list=img_list, download=False, transform=tfs_test)
+    elif mode == 'seg':
+        dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='test', 
+                                 download=False, transform=tfs_test, target_transform=tfs_target)
+    return dataset
+
+
+# def get_transform(split, hw):
+#     transform = None
+#     h, w = hw, hw
+#     if split == 'train':
+#         transform = Compose([Resize((h,w)),
+#                             ToTensor(),
+#                             #RandomHorizontalFlip(p=0.5),
+#                             Normalize(mean, std)])
+#     elif split == 'val':
+#         transform = Compose([Resize((h,w)),
+#                             ToTensor(),
+#                             Normalize(mean, std)])
+#     elif split == 'target':
+#         transform = Compose([Resize((h,w))])
+#                             #ToTensor()])
+#     return transform
+
+
+def re_normalize(x, mean=voc_mean, std=voc_std):
     x_r = x.clone()
     for c, (mean_c, std_c) in enumerate(zip(mean,std)):
         x_r[c] *= std_c
