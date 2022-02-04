@@ -125,17 +125,14 @@ def run(args):
         if args.log_overwrite:
             import shutil
             shutil.rmtree(args.log_path)
-            os.mkdir(args.log_path)
 
         # Make another directory
         else:
             cur_time = str(int(time.time()))
             args.log_path += '_' + cur_time
             args.log_name += '_' +str(int(time.time()))
-    
-    else:
-        # Make log directory
-        os.mkdir(args.log_path)  
+    # Make log directory
+    os.mkdir(args.log_path)  
         
     print('Log Path:', args.log_path)
 
@@ -183,6 +180,11 @@ def run(args):
             if val_acc >= best_acc:
                 torch.save(model.module.state_dict(), os.path.join(args.log_path, 'best.pth'))
                 best_acc = val_acc
+        
+        # Update scheduler
+        if scheduler is not None:
+            scheduler.step()
+
 
     # Final Validation
     if e % args.verbose_interval != 0:
