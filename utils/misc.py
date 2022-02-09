@@ -4,6 +4,7 @@ import copy
 import yaml
 import logging
 import sys
+from torch.utils.tensorboard import SummaryWriter
 
 # deepcopy src values into target(Union(target, src) but src primary)
 def inherit_dict(target, src):
@@ -101,3 +102,14 @@ def make_logger(args):
 
 #     def flush(self):
 #         self.level(sys.stderr)
+
+class TensorBoardLogger:
+    def __init__(self, log_dir):
+        self.log_dir = log_dir
+        self.writer = SummaryWriter(os.path.join(self.log_dir, 'tensorboard'))
+
+    def update(self, tb_dict, it, suffix=None):
+        if suffix is None:
+            suffix = ''
+        for key, value in tb_dict.items():
+            self.writer.add_scalar(suffix + key, value, it)

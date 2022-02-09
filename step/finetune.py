@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 from utils.models import get_model
 from utils.optims import get_finetune_optimzier
 from utils.metrics import eval_multilabel_metric
+from utils.misc import TensorBoardLogger
 
 import logging
 logger = logging.getLogger('main')
@@ -47,18 +48,22 @@ def validate(model, dl, dataset, class_loss):
         # eval
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0)
-        acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, map, acc, precision, recall, f1))
+        acc, precision, recall, f1, ap, map = eval_multilabel_metric(labels, logits, average='samples')
 
     model.train()
-    return val_loss, map, acc, precision, recall, f1
+    return val_loss, acc, precision, recall, f1, ap, map
     
 
 def run(args):
     logger.info('Finetuning...')
 
+    # Initialize Tensorboard logger
+    if args.use_tensorboard:
+        tb_logger = TensorBoardLogger(args.log_path)
+
     # Count GPUs
     n_gpus = torch.cuda.device_count()
+    logger.info(f'{n_gpus} GPUs Available.')
 
     # Seed (reproducibility)
     # import random
@@ -80,6 +85,8 @@ def run(args):
         # Unlabeled dataset
         if args.labeled_ratio < 1.0 or args.train_ulb_list:
             dataset_train_ulb = voc_train_dataset(args, args.train_ulb_list, 'cls')
+        else:
+            dataset_train_ulb = None
 
     # # COCO2014
     # elif args.dataset == 'coco':
@@ -87,6 +94,11 @@ def run(args):
     # # Cityscapes
     # elif args.dataset == 'cityscapes':
     #     pass
+
+    logger.info(f'Train Dataset Length: {len(dataset_train)}')
+    logger.info(f'Validation Dataset Length: {len(dataset_val)}')
+    if dataset_train_ulb is not None:
+        logger.info(f'Unlabeled Train Dataset Length: {len(dataset_train_ulb)}')
     
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
@@ -114,8 +126,8 @@ def run(args):
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
 
     # Loss
-    class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
-    #class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
+    #class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+    class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
 
 
     # Training 
@@ -123,9 +135,9 @@ def run(args):
     for e in range(1, args.train['epochs']+1):
         model.train()
         
+        tb_dict = {}
         train_loss = 0.
-        logits = []
-        labels = []
+        logits, labels = [], []
         for img, label in tqdm(train_dl):
             # memorize labels
             labels.append(label)
@@ -147,25 +159,43 @@ def run(args):
             logits.append(nth_logit)
             
         # Training log
-        # loss
         train_loss /= len(dataset_train)
-        # eval
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0) 
+        
+        # Logging
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
         logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
         #logger.info(optimizer.state_dict)
+        tb_dict['train/acc'] = acc
+        tb_dict['train/precision'] = precision
+        tb_dict['train/recall'] = recall
+        tb_dict['train/f1'] = f1
+        tb_dict['train/map'] = map
+        tb_dict['lr'] = optimizer.param_groups[0]['lr']
+
         # Validation
         if e % args.verbose_interval == 0:
-            _, _, val_acc, _, _, _ = validate(model, val_dl, dataset_val, class_loss)
+            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall, val_f1))
+            tb_dict['eval/acc'] = val_acc
+            tb_dict['eval/precision'] = val_precision
+            tb_dict['eval/recall'] = val_recall
+            tb_dict['eval/f1'] = val_f1
+            tb_dict['eval/map'] = val_map
             # Save Best Model
             if val_acc >= best_acc:
-                torch.save(model.module.state_dict(), os.path.join(args.log_path, 'best.pth'))
+                best_model_path = os.path.join(args.log_path, 'best.pth')
+                torch.save(model.module.state_dict(), best_model_path)
+                logger.info(f'{best_model_path} Saved.')
                 best_acc = val_acc
         
         # Update scheduler
         if scheduler is not None:
             scheduler.step()
+
+        # Update Tensorboard log
+        tb_logger.update(tb_dict, e)
 
 
     # Final Validation
@@ -175,6 +205,7 @@ def run(args):
     # Save final model (split module from dataparallel)
     final_model_path = os.path.join(args.log_path, 'final.pth')
     torch.save(model.module.state_dict(), final_model_path)
+    logger.info(f'{final_model_path} Saved.')
     
     logger.info('Done Finetuning.\n')
 

@@ -1,6 +1,6 @@
 base: ./config/resnet.yml
 name: resnet34
-log_name: resnet34_voc12_1.0
+log_name: resnet34_voc12_1
 log_dir: ./result
 log_overwrite: False
 use_tensorboard: True
@@ -18,7 +18,7 @@ train:
   input_size: 512
   crop_size: 480
   batch_size: 16
-  epochs: 35
+  epochs: 50
 eval:
   crop_size: 480
   batch_size: 64
@@ -33,4 +33,4 @@ optim:
     momentum: 0.9
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
-    max_step: 22960
+    max_step: 33200
