@@ -125,14 +125,13 @@ def run(args):
     # model DDP(TBD)
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
 
-    # Loss
-    #class_loss = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
-    class_loss = nn.BCEWithLogitsLoss(reduction='none').cuda()
+    # Loss (MultiLabelSoftMarginLoss or BCEWithLogitsLoss)
+    class_loss = getattr(nn, args.train['loss'])(reduction='none').cuda()
 
 
     # Training 
     best_acc = 0.0
-    for e in range(1, args.train['epochs']+1):
+    for e in range(args.train['epochs']):
         model.train()
         
         tb_dict = {}
@@ -165,7 +164,7 @@ def run(args):
         
         # Logging
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e, train_loss, map, acc, precision, recall, f1))
+        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e+1, train_loss, map, acc, precision, recall, f1))
         #logger.info(optimizer.state_dict)
         tb_dict['train/acc'] = acc
         tb_dict['train/precision'] = precision
@@ -174,8 +173,8 @@ def run(args):
         tb_dict['train/map'] = map
         tb_dict['lr'] = optimizer.param_groups[0]['lr']
 
-        # Validation
-        if e % args.verbose_interval == 0:
+        # Validation (+ Final Validation)
+        if e % args.verbose_interval == 0 or e+1 == args.train['epochs']:
             val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
             logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall, val_f1))
             tb_dict['eval/acc'] = val_acc
@@ -196,11 +195,6 @@ def run(args):
 
         # Update Tensorboard log
         tb_logger.update(tb_dict, e)
-
-
-    # Final Validation
-    if e % args.verbose_interval != 0:
-        validate(model, val_dl, dataset_val, class_loss)
 
     # Save final model (split module from dataparallel)
     final_model_path = os.path.join(args.log_path, 'final.pth')
