@@ -18,7 +18,8 @@ train:
   input_size: 512
   crop_size: 480
   batch_size: 16
-  epochs: 50
+  epochs: 35
+  loss: MultiLabelSoftMarginLoss
 eval:
   crop_size: 480
   batch_size: 64
@@ -26,6 +27,7 @@ eval:
   thres_limit: 100
   thres_jump: 5
   cam_type: gradcam
+  cam_thres: 15
 optim:
   name: PolyOptimizer
   kwargs:
@@ -33,4 +35,4 @@ optim:
     momentum: 0.9
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
-    max_step: 33200
+    max_step: 23200
