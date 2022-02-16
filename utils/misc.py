@@ -70,7 +70,7 @@ def make_logger(args):
     logger = logging.getLogger("main")
     logger.setLevel(logging.INFO)
     
-    if args.finetune_skip:
+    if args.cls_skip:
         log_path = os.path.join(args.log_dir, args.log_name)
     else:
         log_path = make_log_dir(args)

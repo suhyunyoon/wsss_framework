@@ -38,7 +38,7 @@ def reduce_lr(epoch, optimizer, reduce_points, factor):
  
 
 # Return Optimizer and Scheduler
-def get_finetune_optimzier(args, model):
+def get_cls_optimzier(args, model):
 
     # Load Optimizer method
     if hasattr(optim, args.optim['name']):

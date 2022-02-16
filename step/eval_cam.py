@@ -1,3 +1,5 @@
+# Evaluating generated CAMs
+
 # Use no GPUs
 import torch
 import os

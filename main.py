@@ -68,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument("--labeled_ratio", default=1., type=float)
     
     # Step
-    parser.add_argument("--finetune_skip", action="store_true")
+    parser.add_argument("--cls_skip", action="store_true")
     parser.add_argument("--gen_cam_skip", action="store_true")
     parser.add_argument("--eval_cam_skip", action="store_true")
     #parser.add_argument("--save_cam", action="store_true",
@@ -104,10 +104,10 @@ if __name__ == '__main__':
                 import step.split_label
                 step.split_label.run(args)
 
-            # Finetuning
-            if args.finetune_skip is not True:
-                import step.finetune
-                step.finetune.run(args)
+            # Classification(Finetune)
+            if args.cls_skip is not True:
+                import eval_cam.step.cls
+                step.classification.run(args)
 
             # Generate cam
             if args.gen_cam_skip is not True:

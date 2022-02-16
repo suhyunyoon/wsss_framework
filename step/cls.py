@@ -1,3 +1,5 @@
+# Training Classification Model
+
 import os
 from tqdm import tqdm
 from datetime import datetime
@@ -14,7 +16,7 @@ from torch.utils.data import DataLoader
 # from torch.utils.data.distributed import DistributedSampler
 
 from utils.models import get_model
-from utils.optims import get_finetune_optimzier
+from utils.optims import get_cls_optimzier
 from utils.metrics import eval_multilabel_metric
 from utils.misc import TensorBoardLogger
 
@@ -118,7 +120,7 @@ def run(args):
     model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
     
     # Optimizer
-    optimizer, scheduler = get_finetune_optimzier(args, model)
+    optimizer, scheduler = get_cls_optimzier(args, model)
  
     # model dataparallel
     model = torch.nn.DataParallel(model).cuda()

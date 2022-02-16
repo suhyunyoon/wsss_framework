@@ -1,3 +1,5 @@
+# Splitting label randomly
+
 import os
 import random
 
