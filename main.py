@@ -106,8 +106,8 @@ if __name__ == '__main__':
 
             # Classification(Finetune)
             if args.cls_skip is not True:
-                import eval_cam.step.cls
-                step.classification.run(args)
+                import step.cls
+                step.cls.run(args)
 
             # Generate cam
             if args.gen_cam_skip is not True:

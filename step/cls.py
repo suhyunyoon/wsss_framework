@@ -166,19 +166,19 @@ def run(args):
         
         # Logging
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (e+1, train_loss, map, acc, precision, recall, f1))
+        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (e+1, train_loss, map, acc, precision, recall, f1))
         #logger.info(optimizer.state_dict)
         tb_dict['train/acc'] = acc
         tb_dict['train/precision'] = precision
         tb_dict['train/recall'] = recall
         tb_dict['train/f1'] = f1
         tb_dict['train/map'] = map
-        tb_dict['lr'] = optimizer.param_groups[0]['lr']
+        tb_dict['lr'] = optimizer.param_groups[0]['lr'] # Need modification for other optims except SGDs
 
         # Validation (+ Final Validation)
         if e % args.verbose_interval == 0 or e+1 == args.train['epochs']:
             val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f, F1: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall, val_f1))
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
             tb_dict['eval/acc'] = val_acc
             tb_dict['eval/precision'] = val_precision
             tb_dict['eval/recall'] = val_recall

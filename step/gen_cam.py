@@ -36,11 +36,6 @@ def _work(pid, dataset, args):
 
     # Load model
     model = get_model(args.network, pretrained=False, num_classes=args.voc_class_num-1)
-    
-    #model = torch.nn.DataParallel(model)
-    model.load_state_dict(torch.load(weights_path), strict=False)
-    #model = model.module
-    model.eval()
 
     # Select CAM
     if args.cam_type == 'gradcam':
@@ -68,6 +63,10 @@ def _work(pid, dataset, args):
     # dataloader
     dl = DataLoader(databin, shuffle=False, batch_size=1, num_workers=args.num_workers // n_gpus, pin_memory=False)
     with cuda.device(pid):
+        #model = torch.nn.DataParallel(model)
+        model.load_state_dict(torch.load(weights_path), strict=False)
+        #model = model.module
+        model.eval()
         model = model.cuda()
         
         # target layer
@@ -123,7 +122,7 @@ def _work(pid, dataset, args):
     
 def run(args):
     logger.info('Generating CAM...')
-
+    
     # GPUs
     n_gpus = torch.cuda.device_count()
 
