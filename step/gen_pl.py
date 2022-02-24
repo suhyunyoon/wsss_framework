@@ -9,7 +9,7 @@ import torch
 from data.classes import get_voc_class
 
 from data.datasets import voc_val_dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 
 from utils.models import get_model
 
@@ -17,25 +17,22 @@ import logging
 logger = logging.getLogger('main')
 
 # Multi-label class prediction
-def predict(model, dl, to_numpy=True):
+def predict(model, dl):
     model.eval()
     with torch.no_grad():
         logits = []
         for img, _ in tqdm(dl):
             # memorize labels
             img = img.cuda()
-            # calc loss
-            logit = model(img)
-            # acc
-            logit = torch.sigmoid(logit).detach()
+            # logit
+            logit = model(img).detach()
             logits.append(logit)
-        # Eval
-        # eval
+        # calc prediction
         logits = torch.cat(logits, dim=0)
         pred = (torch.sigmoid(logits) >= 0.5).detach().cpu()
 
-        if to_numpy:
-            pred = pred.numpy()
+        # if to_numpy:
+        #     pred = pred.numpy()
 
     return pred
 
@@ -60,12 +57,12 @@ def run(args):
         # whole dataset
         else:
             dataset = voc_val_dataset(args, args.train_list, 'cls')
+        
+        # Concat with Validation dataset
+        dataset_val = voc_val_dataset(args, args.eval_list, 'cls')
 
     logger.info(f'Dataset Length: {len(dataset)}')
-    
-    # Dataloader
-    dl = DataLoader(dataset, batch_size=args.eval['batch_size'], num_workers=args.num_workers, 
-                        shuffle=False, sampler=None, pin_memory=True)
+    logger.info(f'Val Dataset Length: {len(dataset_val)}')
 
     # Get Model
     model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
@@ -75,8 +72,18 @@ def run(args):
     model.eval()
     model = model.cuda()
     
-    pred = predict(model, dl, to_numpy=True)
-    idx = {os.path.splitext(os.path.basename(img))[0] : i for i, img in enumerate(dataset.images)}
+    pred = None
+    for dset in [dataset, dataset_val]:
+        # Dataloader
+        dl = DataLoader(dset, batch_size=args.eval['batch_size'], num_workers=args.num_workers, 
+                            shuffle=False, sampler=None, pin_memory=True)
+        pred_ = predict(model, dl)
+        if pred is None:
+            pred = pred_
+        else:
+            pred = torch.cat([pred, pred_], dim=0)
+            
+    idx = {os.path.splitext(os.path.basename(img))[0] : i for i, img in enumerate(dataset.images + dataset_val.images)}
     pack = {'idx': idx, 'pred': pred}
 
     prediction_path = os.path.join(args.log_path, 'cls_pred.npy')

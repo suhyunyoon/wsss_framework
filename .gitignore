@@ -8,3 +8,4 @@ __pycache__/
 
 external/*
 result/*
+data/voc12/split
