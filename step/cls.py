@@ -57,7 +57,7 @@ def validate(model, dl, dataset, class_loss):
     
 
 def run(args):
-    logger.info('Finetuning...')
+    logger.info('Training Classifier...')
 
     # Initialize Tensorboard logger
     if args.use_tensorboard:
@@ -166,7 +166,7 @@ def run(args):
         
         # Logging
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (e+1, train_loss, map, acc, precision, recall, f1))
+        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (e+1, train_loss, map, acc, precision, recall))
         #logger.info(optimizer.state_dict)
         tb_dict['train/acc'] = acc
         tb_dict['train/precision'] = precision

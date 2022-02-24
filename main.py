@@ -2,7 +2,7 @@ import argparse
 import os
 from data.classes import get_voc_class
 
-from utils.misc import load_config, overwrite_args_from_yaml, make_logger
+from utils.misc import overwrite_args_from_yaml, make_logger
 
 import traceback
 import warnings
@@ -30,6 +30,7 @@ if __name__ == '__main__':
     #                     help="fine or coarse")
     # Dataset split
     parser.add_argument("--train_list", default="./data/voc12/train_aug.txt", type=str)
+    parser.add_argument("--train_ulb_list", type=str)
     parser.add_argument("--eval_list", default="./data/voc12/val.txt", type=str,
                         help="voc12: train/val/trainval/train_aug, cityscapes: train/train_extra(coarse mode)/val/test(fine mode)")
 
@@ -69,6 +70,7 @@ if __name__ == '__main__':
     
     # Step
     parser.add_argument("--cls_skip", action="store_true")
+    parser.add_argument("--gen_pl_skip", action="store_true")
     parser.add_argument("--gen_cam_skip", action="store_true")
     parser.add_argument("--eval_cam_skip", action="store_true")
     #parser.add_argument("--save_cam", action="store_true",
@@ -104,10 +106,15 @@ if __name__ == '__main__':
                 import step.split_label
                 step.split_label.run(args)
 
-            # Classification(Finetune)
+            # Classification (with WSSS methods, TBD)
             if args.cls_skip is not True:
                 import step.cls
                 step.cls.run(args)
+
+            # Generate class pseudo-labels
+            if args.gen_pl_skip is not True:
+                import step.gen_pl
+                step.gen_pl.run(args)
 
             # Generate cam
             if args.gen_cam_skip is not True:

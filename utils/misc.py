@@ -21,7 +21,7 @@ def inherit_dict(target, src):
 
     return ret
 
-# Load Configuration yaml file
+# Load Configuration yaml file (currently useless)
 def load_config(cfg_path):
 
     with open(cfg_path) as f:
