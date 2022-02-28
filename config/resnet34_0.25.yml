@@ -17,21 +17,34 @@ train:
   input_size: 512
   crop_size: 480
   batch_size: 16
-  epochs: 100
-  loss: MultiLabelSoftMarginLoss
+  epochs: 180
+  loss: 
+    name: AsymmetricLoss
+    kwargs:
+      gamma_neg: 4
+      gamma_pos: 0
+      clip: 0.05
+      disable_torch_grad_focal_loss: True
 eval:
   crop_size: 512
-  batch_size: 64
+  batch_size: 32
   thres_start: 5
-  thres_limit: 100
+  thres_limit: 75
   thres_jump: 5
   cam_type: gradcam
   cam_thres: 15
 optim:
-  name: PolyOptimizer
+  name: Adam
   kwargs:
-    lr: 0.03 #0.1
-    momentum: 0.9
-    weight_decay: 0.0005
+    lr: 0.0001
+    weight_decay: 0.0001
     # (N(dataset) // batch_size) * epochs
-    max_step: 16600
+    #max_step: 16600
+scheduler:
+  name: OneCycleLR
+  kwargs:
+    max_lr: 0.0001
+    # (N(dataset) // batch_size)
+    steps_per_epoch: 165
+    epochs: 180
+    pct_start: 0.2
