@@ -1,5 +1,5 @@
-name: resnet50
-log_name: resnet50_voc12_1
+name: resnet34
+log_name: resnet34_voc12_0.05
 log_dir: ./result
 log_overwrite: False
 use_tensorboard: True
@@ -9,15 +9,15 @@ dataset: voc12
 dataset_root: ../../dataset/VOC/
 seed: 42
 labeled_ratio: 1.0
-train_list: ./data/voc12/train_aug.txt
-train_ulb_list: False
+#train_list: ./data/voc12/train_aug.txt
+train_ulb_list: ./data/voc12/train_aug.txt
 eval_list: ./data/voc12/val.txt
 verbose_interval: 3
 train:
   input_size: 512
   crop_size: 480
-  batch_size: 16
-  epochs: 50 #35
+  batch_size: 32
+  epochs: 150 #35
   loss: MultiLabelSoftMarginLoss
 eval:
   crop_size: 512
@@ -34,4 +34,4 @@ optim:
     momentum: 0.9
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
-    max_step: 33100
+    max_step: 8300

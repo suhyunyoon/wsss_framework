@@ -1,5 +1,5 @@
-name: resnet50
-log_name: resnet50_voc12_1
+name: resnet152
+log_name: resnet152_voc12_1
 log_dir: ./result
 log_overwrite: False
 use_tensorboard: True

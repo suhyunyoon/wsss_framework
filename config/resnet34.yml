@@ -1,4 +1,3 @@
-base: ./config/resnet.yml
 name: resnet34
 log_name: resnet34_voc12_1
 log_dir: ./result
@@ -18,10 +17,10 @@ train:
   input_size: 512
   crop_size: 480
   batch_size: 16
-  epochs: 35
+  epochs: 50 #35
   loss: MultiLabelSoftMarginLoss
 eval:
-  crop_size: 480
+  crop_size: 512
   batch_size: 64
   thres_start: 5
   thres_limit: 100
@@ -31,8 +30,8 @@ eval:
 optim:
   name: PolyOptimizer
   kwargs:
-    lr: 0.1
+    lr: 0.03 #0.1
     momentum: 0.9
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
-    max_step: 23200
+    max_step: 33100
