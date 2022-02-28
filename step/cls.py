@@ -15,6 +15,7 @@ from data.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
 from torch.utils.data import DataLoader
 # from torch.utils.data.distributed import DistributedSampler
 
+import utils.loss
 from utils.models import get_model
 from utils.optims import get_cls_optimzier
 from utils.metrics import eval_multilabel_metric
@@ -52,7 +53,6 @@ def validate(model, dl, dataset, class_loss):
         labels = torch.cat(labels, dim=0)
         acc, precision, recall, f1, ap, map = eval_multilabel_metric(labels, logits, average='samples')
 
-    model.train()
     return val_loss, acc, precision, recall, f1, ap, map
     
 
@@ -127,16 +127,31 @@ def run(args):
     # model DDP(TBD)
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
 
-    # Loss (MultiLabelSoftMarginLoss or BCEWithLogitsLoss)
-    class_loss = getattr(nn, args.train['loss'])(reduction='none').cuda()
+    # Loss (MultiLabelSoftMarginLoss or BCEWithLogitsLoss or etc..)
+    class_loss = getattr(utils.loss, args.train['loss']['name'])(**args.train['loss']['kwargs']).cuda()
 
 
     # Training 
     best_acc = 0.0
     for e in range(args.train['epochs']):
-        model.train()
-        
         tb_dict = {}
+        # Validation
+        if e % args.verbose_interval == 0:
+            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
+            tb_dict['eval/acc'] = val_acc
+            tb_dict['eval/precision'] = val_precision
+            tb_dict['eval/recall'] = val_recall
+            tb_dict['eval/f1'] = val_f1
+            tb_dict['eval/map'] = val_map
+            # Save Best Model
+            if val_acc >= best_acc:
+                best_model_path = os.path.join(args.log_path, 'best.pth')
+                torch.save(model.module.state_dict(), best_model_path)
+                logger.info(f'{best_model_path} Saved.')
+                best_acc = val_acc
+
+        model.train()
         train_loss = 0.
         logits, labels = [], []
         for img, label in tqdm(train_dl):
@@ -174,22 +189,6 @@ def run(args):
         tb_dict['train/f1'] = f1
         tb_dict['train/map'] = map
         tb_dict['lr'] = optimizer.param_groups[0]['lr'] # Need modification for other optims except SGDs
-
-        # Validation (+ Final Validation)
-        if e % args.verbose_interval == 0 or e+1 == args.train['epochs']:
-            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
-            tb_dict['eval/acc'] = val_acc
-            tb_dict['eval/precision'] = val_precision
-            tb_dict['eval/recall'] = val_recall
-            tb_dict['eval/f1'] = val_f1
-            tb_dict['eval/map'] = val_map
-            # Save Best Model
-            if val_acc >= best_acc:
-                best_model_path = os.path.join(args.log_path, 'best.pth')
-                torch.save(model.module.state_dict(), best_model_path)
-                logger.info(f'{best_model_path} Saved.')
-                best_acc = val_acc
         
         # Update scheduler
         if scheduler is not None:
@@ -197,6 +196,16 @@ def run(args):
 
         # Update Tensorboard log
         tb_logger.update(tb_dict, e)
+
+    # Final Validation
+    val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
+    logger.info('Final Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
+    tb_dict['eval/acc'] = val_acc
+    tb_dict['eval/precision'] = val_precision
+    tb_dict['eval/recall'] = val_recall
+    tb_dict['eval/f1'] = val_f1
+    tb_dict['eval/map'] = val_map
+    tb_logger.update(tb_dict, args.train['epochs'])
 
     # Save final model (split module from dataparallel)
     final_model_path = os.path.join(args.log_path, 'final.pth')
