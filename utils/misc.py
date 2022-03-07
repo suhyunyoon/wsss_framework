@@ -1,9 +1,7 @@
 import os
-import time
 import copy
 import yaml
 import logging
-import sys
 from torch.utils.tensorboard import SummaryWriter
 
 # deepcopy src values into target(Union(target, src) but src primary)
@@ -56,9 +54,10 @@ def make_log_dir(args):
 
         # Make another directory
         else:
-            cur_time = str(int(time.time()))
-            log_path += '_' + cur_time
-            args.log_name += '_' +str(int(time.time()))
+            # cur_time = str(int(time.time()))
+            # log_path += '_' + cur_time
+            # args.log_name += '_' +str(int(time.time()))
+            raise FileExistsError(f'{args.log_name} Already Exists!')
     # Make log directory
     os.mkdir(log_path)  
 
