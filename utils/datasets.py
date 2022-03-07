@@ -91,12 +91,13 @@ voc_std = [0.229, 0.224, 0.225]
 def voc_train_dataset(args, img_list, mode='cls'):
     tfs_train = tfs.Compose([tfs.Resize((args.train['input_size'], args.train['input_size'])),  
                             tfs.RandomHorizontalFlip(),
-                            tfs.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-                            tfs.RandomCrop(args.train['crop_size']),
+                            tfs.RandomCrop(args.train['crop_size'], padding=4, padding_mode='reflect'),
+                            #tfs.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
                             tfs.ToTensor(),
                             tfs.Normalize(voc_mean, voc_std),
                             ])
-    tfs_target = tfs.Compose([tfs.Resize((args.train['crop_size'], args.train['crop_size']))])
+    tfs_target = tfs.Compose([tfs.Resize((args.train['crop_size'], args.train['crop_size']))
+                            ])
 
     if mode == 'cls':
         dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='train', 
@@ -112,7 +113,8 @@ def voc_val_dataset(args, img_list, mode='cls'):
                             tfs.ToTensor(),
                             tfs.Normalize(voc_mean, voc_std),
                             ])
-    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))])
+    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))
+                            ])
 
     if mode == 'cls':
         dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='val', 
@@ -127,7 +129,8 @@ def voc_test_dataset(args, img_list, mode='cls'):
                             tfs.ToTensor(),
                             tfs.Normalize(voc_mean, voc_std),
                             ])
-    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))])
+    tfs_target = tfs.Compose([tfs.Resize((args.eval['crop_size'], args.eval['crop_size']))
+                            ])
 
     if mode == 'cls':
         dataset = VOCClassification(root=args.dataset_root, year='2012', image_set='test', 

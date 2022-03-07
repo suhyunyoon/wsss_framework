@@ -10,7 +10,7 @@ import glob
 from tqdm import tqdm
 
 from chainercv.evaluations import calc_semantic_segmentation_confusion
-from data.classes import get_voc_class
+from utils.datasets import get_voc_class
 
 import logging
 logger = logging.getLogger('main')
@@ -51,8 +51,8 @@ def run(args):
     args.cam_dir = os.path.join(args.log_path, 'cam')
 
     # stored CAM file list
-    cam_list = glob.glob(os.path.join(args.cam_dir, '*.pickle'))
-    logger.info(cam_list)
+    cam_list = glob.glob(os.path.join(args.cam_dir, '*.npy'))
+    logger.info(f'Reading {len(cam_list)} Object files.')
 
     # Evaluated thresholds
     eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
@@ -61,14 +61,12 @@ def run(args):
     res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
     for cam_path in cam_list:
         # Read CAM files
-        logger.info(f"Read CAM files... ({cam_path})")
-        with open(cam_path, 'rb') as f:
-            r = pickle.load(f)
-        #print(len(res['segs']), res['segs'][0].shape)
+        r = np.load(cam_path, allow_pickle=True).item()
         # concat
+        #import pdb; pdb.set_trace()
         for th in eval_thres:
-            res['segs'][th] += r['segs'][th]
-            res['preds'][th] += r['preds'][th]
+            res['segs'][th].append(r['segs'][th])
+            res['preds'][th].append(r['preds'][th])
 
     # Calc ious
     ious, mious = [], []

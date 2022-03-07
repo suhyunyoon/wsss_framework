@@ -36,7 +36,7 @@ def _work(pid, dataset, args):
 
     # Load model
     model = get_model(args.network, pretrained=False, num_classes=args.voc_class_num-1)
-
+    
     # Select CAM
     if args.cam_type == 'gradcam':
         CAM = GradCAM
@@ -62,6 +62,7 @@ def _work(pid, dataset, args):
     n_gpus = torch.cuda.device_count()
     # dataloader
     dl = DataLoader(databin, shuffle=False, batch_size=1, num_workers=args.num_workers // n_gpus, pin_memory=False)
+
     with cuda.device(pid):
         #model = torch.nn.DataParallel(model)
         model.load_state_dict(torch.load(weights_path), strict=False)
@@ -77,9 +78,8 @@ def _work(pid, dataset, args):
         make_cam = CAM(model=model, target_layers=[target_layer], use_cuda=True, reshape_transform=target_tr)
         # save CAM per threshold
         eval_thres = np.arange(args.eval_thres_start, args.eval_thres_limit, args.eval_thres_jump)
-        res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
         # Generate CAM
-        for img, seg in tqdm(dl):
+        for idx, (img, seg) in enumerate(tqdm(dl)):
             img = img.cuda()
             # squeeze & remove border
             seg = np.squeeze(np.array(seg, dtype=np.uint8), axis=0)
@@ -90,19 +90,16 @@ def _work(pid, dataset, args):
             label = np.intersect1d(np.arange(1, args.voc_class_num), label)
             targets = [ClassifierOutputTarget(i-1) for i in label]
             #print(torch.sigmoid(model(img)), label)
-
-            # Generate CAM
+    
+            # Make CAM
             img = img.repeat(len(label),1,1,1)
             pred_cam = make_cam(input_tensor=img, targets=targets)
-            #import matplotlib.pyplot as plt
-            #for cam in pred_cam:
-            #    plt.imshow(cam)
-            #    plt.show()
             
             # Add background
             label = np.pad(label, (1,0), mode='constant', constant_values=0)
-
+    
             # Iter by thresholds
+            res = {'segs': {th:[] for th in eval_thres}, 'preds': {th:[] for th in eval_thres}}
             for th in eval_thres:
                 # Add background(CAM)
                 cam_th = np.pad(pred_cam, ((1,0),(0,0),(0,0)), mode='constant', constant_values=th/100)
@@ -110,16 +107,15 @@ def _work(pid, dataset, args):
                 pred = label[pred]
                 
                 # Append
-                res['segs'][th].append(seg)
-                res['preds'][th].append(pred)
-
-    file_name = os.path.join(args.cam_dir, f'{pid}.pickle')    
-    with open(file_name, 'wb') as f:
-        pickle.dump(res, f)
+                res['segs'][th] = seg
+                res['preds'][th] = pred
+            
+            file_name = os.path.join(args.cam_dir, f'{pid}_{idx}.npy') 
+            np.save(file_name, res)
 
     # clear gpu cache
     torch.cuda.empty_cache()
-    
+
 def run(args):
     logger.info('Generating CAM...')
     
