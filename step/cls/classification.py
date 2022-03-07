@@ -8,53 +8,21 @@ import time
 import torch
 from torch import nn
 
-from data.classes import get_voc_class #, get_voc_colormap, get_imagenet_class
-
 # from torchvision.datasets import VOCSegmentation, VOCDetection
-from data.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
+from utils.datasets import get_voc_class, voc_train_dataset, voc_val_dataset, voc_test_dataset
 from torch.utils.data import DataLoader
 # from torch.utils.data.distributed import DistributedSampler
 
 import utils.loss
 from utils.models import get_model
 from utils.optims import get_cls_optimzier
-from utils.metrics import eval_multilabel_metric
+
 from utils.misc import TensorBoardLogger
+from utils.train import validate, eval_multilabel_metric
 
 import logging
 logger = logging.getLogger('main')
 
-# Validation in training
-def validate(model, dl, dataset, class_loss):
-    model.eval()
-    with torch.no_grad():
-        val_loss = 0.
-        logits = []
-        labels = []
-        for img, label in tqdm(dl):
-            # memorize labels
-            labels.append(label)
-            img, label = img.cuda(), label.cuda()
-            
-            # calc loss
-            logit = model(img)
-            loss = class_loss(logit, label).mean()
-            
-            # loss
-            val_loss += loss.detach().cpu()
-            # acc
-            logit = torch.sigmoid(logit).detach()
-            logits.append(logit)
-        # Eval
-        # loss
-        val_loss /= len(dataset)
-        # eval
-        logits = torch.cat(logits, dim=0).cpu()
-        labels = torch.cat(labels, dim=0)
-        acc, precision, recall, f1, ap, map = eval_multilabel_metric(labels, logits, average='samples')
-
-    return val_loss, acc, precision, recall, f1, ap, map
-    
 
 def run(args):
     logger.info('Training Classifier...')

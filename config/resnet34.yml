@@ -13,12 +13,16 @@ train_list: ./data/voc12/train_aug.txt
 train_ulb_list: False
 eval_list: ./data/voc12/val.txt
 verbose_interval: 3
+alg: None
 train:
   input_size: 512
   crop_size: 480
   batch_size: 16
   epochs: 50 #35
-  loss: MultiLabelSoftMarginLoss
+  loss: 
+    name: MultiLabelSoftMarginLoss
+    kwargs:
+      reduction: none
 eval:
   crop_size: 512
   batch_size: 64

@@ -1,6 +1,5 @@
 import argparse
 import os
-from data.classes import get_voc_class
 
 from utils.misc import overwrite_args_from_yaml, make_logger
 
@@ -87,6 +86,7 @@ if __name__ == '__main__':
    
     # voc12
     if args.dataset == 'voc12':
+        from utils.datasets import get_voc_class
         args.voc_class = get_voc_class()
         args.voc_class_num = len(args.voc_class)
 
@@ -106,10 +106,14 @@ if __name__ == '__main__':
                 import step.split_label
                 step.split_label.run(args)
 
-            # Classification (with WSSS methods, TBD)
+            # Classification (with WSSS methods)
             if args.cls_skip is not True:
-                import step.cls
-                step.cls.run(args)
+                # WSSS Methods
+                if args.alg == '???':
+                    pass                
+                else:
+                    import step.cls.classification
+                    step.cls.classification.run(args)
 
             # Generate class pseudo-labels
             if args.gen_pl_skip is not True:

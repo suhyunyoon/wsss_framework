@@ -6,9 +6,7 @@ from tqdm import tqdm
 
 import torch
 
-from data.classes import get_voc_class
-
-from data.datasets import voc_val_dataset
+from utils.datasets import get_voc_class, voc_val_dataset
 from torch.utils.data import DataLoader, ConcatDataset
 
 from utils.models import get_model

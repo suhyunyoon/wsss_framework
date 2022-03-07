@@ -7,6 +7,23 @@ from torchvision import transforms as tfs
 import numpy as np
 import os
 
+
+# ImageNet
+# !wget https://gist.githubusercontent.com/yrevar/942d3a0ac09ec9e5eb3a/raw/238f720ff059c1f82f368259d1ca4ffa5dd8f9f5/imagenet1000_clsidx_to_labels.txt
+def get_imagenet_class(src='./data/imagenet.txt'):
+    with open(src, 'r') as f:
+        #lines = f.readlines()
+        #lines = list(map(lambda x:x.split(':'), lines))
+        #imagenet_class = {int(k.strip()): v.strip()[1:-2] for k, v in lines}
+        
+        lines = f.read()
+        lines = list(map(lambda x:x.split(':')[1], lines[1:].split('\n')[:-1]))
+    imagenet_class = [line.strip()[1:-2] for line in lines]
+
+    return imagenet_class
+
+
+# VOC
 # VOC class names
 voc_class = [
     "background",
@@ -57,6 +74,13 @@ voc_colormap = [
     [128, 192, 0],
     [0, 64, 128],
 ]
+
+def get_voc_class():
+    return voc_class
+
+def get_voc_colormap():
+    return voc_colormap
+
 
 # transformation
 voc_mean = [0.485, 0.456, 0.406]
@@ -112,25 +136,7 @@ def voc_test_dataset(args, img_list, mode='cls'):
         dataset = VOCSegmentationInt(root=args.dataset_root, year='2012', image_set='test', 
                                  download=False, transform=tfs_test, target_transform=tfs_target)
     return dataset
-
-
-# def get_transform(split, hw):
-#     transform = None
-#     h, w = hw, hw
-#     if split == 'train':
-#         transform = Compose([Resize((h,w)),
-#                             ToTensor(),
-#                             #RandomHorizontalFlip(p=0.5),
-#                             Normalize(mean, std)])
-#     elif split == 'val':
-#         transform = Compose([Resize((h,w)),
-#                             ToTensor(),
-#                             Normalize(mean, std)])
-#     elif split == 'target':
-#         transform = Compose([Resize((h,w))])
-#                             #ToTensor()])
-#     return transform
-
+    
 
 def re_normalize(x, mean=voc_mean, std=voc_std):
     x_r = x.clone()

@@ -19,7 +19,7 @@ from pytorch_grad_cam.utils.model_targets import SemanticSegmentationTarget, Cla
 #from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from utils.models import get_model, get_cam_target_layer, get_reshape_transform
-from data.datasets import voc_train_dataset, voc_val_dataset
+from utils.datasets import voc_train_dataset, voc_val_dataset
 
 import logging
 logger = logging.getLogger('main')
