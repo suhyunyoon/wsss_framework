@@ -2,14 +2,12 @@
 
 import os
 from tqdm import tqdm
-from datetime import datetime
-import time
 
 import torch
-from torch import nn
+from torch import nn, multiprocessing
 
 # from torchvision.datasets import VOCSegmentation, VOCDetection
-from utils.datasets import get_voc_class, voc_train_dataset, voc_val_dataset, voc_test_dataset
+from utils.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
 from torch.utils.data import DataLoader
 # from torch.utils.data.distributed import DistributedSampler
 
@@ -23,53 +21,18 @@ from utils.train import validate, eval_multilabel_metric
 import logging
 logger = logging.getLogger('main')
 
-
-def run(args):
-    logger.info('Training Classifier...')
-
-    # Initialize Tensorboard logger
-    if args.use_tensorboard:
-        tb_logger = TensorBoardLogger(args.log_path)
-
-    # Count GPUs
-    n_gpus = torch.cuda.device_count()
-    logger.info(f'{n_gpus} GPUs Available.')
-
-    # Seed (reproducibility)
+# Seed (reproducibility)
     # import random
     # random.seed(args.seed)
     # torch.manual_seed(args.seed)
     # np.random.seed(args.seed)
     # cudnn.deterministic = True
 
-    # Dataset
-    # VOC2012
-    if args.dataset == 'voc12':
-        voc_class = get_voc_class()
-        voc_class_num = len(voc_class)
+def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
+    # Initialize Tensorboard logger
+    if args.use_tensorboard:
+        tb_logger = TensorBoardLogger(args.log_path)
 
-        # dataset
-        dataset_train = voc_train_dataset(args, args.train_list, 'cls')
-        dataset_val = voc_val_dataset(args, args.eval_list, 'cls')
-        
-        # Unlabeled dataset
-        if args.labeled_ratio < 1.0 or args.train_ulb_list:
-            dataset_train_ulb = voc_train_dataset(args, args.train_ulb_list, 'cls')
-        else:
-            dataset_train_ulb = None
-
-    # # COCO2014
-    # elif args.dataset == 'coco':
-    #     pass
-    # # Cityscapes
-    # elif args.dataset == 'cityscapes':
-    #     pass
-
-    logger.info(f'Train Dataset Length: {len(dataset_train)}')
-    logger.info(f'Validation Dataset Length: {len(dataset_val)}')
-    if dataset_train_ulb is not None:
-        logger.info(f'Unlabeled Train Dataset Length: {len(dataset_train_ulb)}')
-    
     # Dataloader
     #train_sampler = DistributedSampler(dataset_train)
     #val_sampler = DistributedSampler(dataset_val)
@@ -83,9 +46,8 @@ def run(args):
         train_ulb_dl = DataLoader(dataset_train_ulb, batch_size=args.train['batch_size'],
                                   num_workers=args.num_workers, shuffle=True, sampler=None, pin_memory=True)
 
-
     # Get Model
-    model = get_model(args.network, pretrained=True, num_classes=voc_class_num-1)
+    model = get_model(args.network, pretrained=True, num_classes=args.voc_class_num-1)
     
     # Optimizer
     optimizer, scheduler = get_cls_optimzier(args, model)
@@ -97,7 +59,6 @@ def run(args):
 
     # Loss (MultiLabelSoftMarginLoss or BCEWithLogitsLoss or etc..)
     class_loss = getattr(utils.loss, args.train['loss']['name'])(**args.train['loss']['kwargs']).cuda()
-
 
     # Training 
     best_acc = 0.0
@@ -179,6 +140,42 @@ def run(args):
     final_model_path = os.path.join(args.log_path, 'final.pth')
     torch.save(model.module.state_dict(), final_model_path)
     logger.info(f'{final_model_path} Saved.')
+
+
+def run(args):
+    logger.info('Training Classifier...')
+
+    # Count GPUs
+    n_gpus = torch.cuda.device_count()
+    logger.info(f'{n_gpus} GPUs Available.')
+
+    # Dataset
+    # VOC2012
+    if args.dataset == 'voc12':
+        # dataset
+        dataset_train = voc_train_dataset(args, args.train_list, 'cls')
+        dataset_val = voc_val_dataset(args, args.eval_list, 'cls')
+        
+        # Unlabeled dataset
+        if args.labeled_ratio < 1.0 or args.train_ulb_list:
+            dataset_train_ulb = voc_train_dataset(args, args.train_ulb_list, 'cls')
+        else:
+            dataset_train_ulb = None
+
+    # # COCO2014
+    # elif args.dataset == 'coco':
+    #     pass
+    # # Cityscapes
+    # elif args.dataset == 'cityscapes':
+    #     pass
+
+    logger.info(f'Train Dataset Length: {len(dataset_train)}')
+    logger.info(f'Validation Dataset Length: {len(dataset_val)}')
+    if dataset_train_ulb is not None:
+        logger.info(f'Unlabeled Train Dataset Length: {len(dataset_train_ulb)}')
+    
+    # Multiprocessing (But 1 process)
+    multiprocessing.spawn(_work, nprocs=1, args=(args, dataset_train, dataset_val, dataset_train_ulb), join=True)
     
     logger.info('Done Finetuning.\n')
 
