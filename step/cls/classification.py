@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 import torch
 from torch import nn, multiprocessing
+import torch.distributed as dist
 
 # from torchvision.datasets import VOCSegmentation, VOCDetection
 from utils.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
@@ -15,7 +16,7 @@ import utils.loss
 from utils.models import get_model
 from utils.optims import get_cls_optimzier
 
-from utils.misc import TensorBoardLogger
+from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
 import logging
@@ -29,6 +30,10 @@ logger = logging.getLogger('main')
     # cudnn.deterministic = True
 
 def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
+    #dist.init_process_group(backend=args.distributed_backend, init_method=args.distributed_url,
+    #                            world_size=1, rank=0)
+    logger, _ = make_logger(args, is_new=False)
+
     # Initialize Tensorboard logger
     if args.use_tensorboard:
         tb_logger = TensorBoardLogger(args.log_path)

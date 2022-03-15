@@ -54,9 +54,6 @@ def make_log_dir(args):
 
         # Make another directory
         else:
-            # cur_time = str(int(time.time()))
-            # log_path += '_' + cur_time
-            # args.log_name += '_' +str(int(time.time()))
             raise FileExistsError(f'{args.log_name} Already Exists!')
     # Make log directory
     os.mkdir(log_path)  
@@ -65,14 +62,15 @@ def make_log_dir(args):
 
 
 # add args.log_path
-def make_logger(args):
+def make_logger(args, is_new=False):
     logger = logging.getLogger("main")
     logger.setLevel(logging.INFO)
     
-    if args.cls_skip:
-        log_path = os.path.join(args.log_dir, args.log_name)
-    else:
+    # Make New dir
+    if is_new and not args.cls_skip:
         log_path = make_log_dir(args)
+    else:
+        log_path = os.path.join(args.log_dir, args.log_name)
 
     formatter = logging.Formatter(fmt="[%(asctime)s %(levelname)s] %(message)s")
 
@@ -84,23 +82,9 @@ def make_logger(args):
 
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
-
-    #sys.stdout = LoggerWriter(logger.warning)
-    #sys.stderr = LoggerWriter(logger.error)
     
     return logger, log_path
-    
 
-# class LoggerWriter:
-#     def __init__(self, level):
-#         self.level = level
-
-#     def write(self, message):
-#         if message != '\n':
-#             self.level(message)
-
-#     def flush(self):
-#         self.level(sys.stderr)
 
 class TensorBoardLogger:
     def __init__(self, log_dir):

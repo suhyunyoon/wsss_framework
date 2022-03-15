@@ -95,7 +95,7 @@ if __name__ == '__main__':
         os.mkdir(args.log_dir)
     
     # Logging
-    logger, args.log_path = make_logger(args)
+    logger, args.log_path = make_logger(args, is_new=True)
     logger.info(args)
     
     # Run 

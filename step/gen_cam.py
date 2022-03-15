@@ -20,6 +20,7 @@ from pytorch_grad_cam.utils.model_targets import SemanticSegmentationTarget, Cla
 
 from utils.models import get_model, get_cam_target_layer, get_reshape_transform
 from utils.datasets import voc_train_dataset, voc_val_dataset
+from utils.misc import make_logger
 
 import logging
 logger = logging.getLogger('main')
@@ -27,6 +28,7 @@ logger = logging.getLogger('main')
 cudnn.enabled = True
 
 def _work(pid, dataset, args):
+    logger, _ = make_logger(args, is_new=False)
 
     # Log path
     if args.weights_name is None:

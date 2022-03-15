@@ -15,7 +15,7 @@ import utils.loss
 from utils.models import get_model
 from utils.optims import get_cls_optimzier
 
-from utils.misc import TensorBoardLogger
+from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
 # Channel-wise Regularization
@@ -23,7 +23,7 @@ from torchvision.models.feature_extraction import create_feature_extractor
 
 import logging
 logger = logging.getLogger('main')
-print(id(logger), logger)
+
 # Seed (reproducibility)
     # import random
     # random.seed(args.seed)
@@ -31,8 +31,9 @@ print(id(logger), logger)
     # np.random.seed(args.seed)
     # cudnn.deterministic = True
 
-def _work(pid, args, logger, dataset_train, dataset_val, dataset_train_ulb):
-    print(id(logger), logger)
+def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
+    logger, _ = make_logger(args, is_new=False)
+
     # Initialize Tensorboard logger
     if args.use_tensorboard:
         tb_logger = TensorBoardLogger(args.log_path)
