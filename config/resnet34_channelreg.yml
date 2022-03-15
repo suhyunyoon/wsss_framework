@@ -1,0 +1,47 @@
+network: creg_resnet34
+log_name: resnet34_channelreg_voc12_1
+log_dir: ./result
+log_overwrite: True
+use_tensorboard: True
+distributed_multiprocessing: False
+distributed_backend: nccl
+dataset: voc12
+dataset_root: ../../dataset/VOC/
+seed: 42
+labeled_ratio: 1.0
+train_list: ./data/voc12/train_aug.txt
+train_ulb_list: False
+eval_list: ./data/voc12/val.txt
+verbose_interval: 3
+alg: channelreg
+train:
+  input_size: 512
+  crop_size: 480
+  batch_size: 16
+  epochs: 50 
+  loss: 
+    name: MultiLabelSoftMarginLoss
+    kwargs:
+      reduction: none
+  lambda: 1
+eval:
+  crop_size: 512
+  batch_size: 64
+  thres_start: 5
+  thres_limit: 100
+  thres_jump: 5
+  cam_type: gradcam
+  cam_thres: 15
+  multi_scale:
+    - 1.0
+    - 0.5
+    - 1.5
+    - 2.0
+optim:
+  name: PolyOptimizer
+  kwargs:
+    lr: 0.03 #0.1
+    momentum: 0.9
+    weight_decay: 0.0005
+    # (N(dataset) // batch_size) * epochs
+    max_step: 33100

@@ -109,8 +109,9 @@ if __name__ == '__main__':
             # Classification (with WSSS methods)
             if args.cls_skip is not True:
                 # WSSS Methods
-                if args.alg == '???':
-                    pass                
+                if args.alg == 'channelreg':
+                    import step.cls.channelreg_cls
+                    step.cls.channelreg_cls.run(args)
                 else:
                     import step.cls.classification
                     step.cls.classification.run(args)
