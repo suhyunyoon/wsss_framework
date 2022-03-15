@@ -182,7 +182,7 @@ def run(args):
         logger.info(f'Unlabeled Train Dataset Length: {len(dataset_train_ulb)}')
     
     # Multiprocessing (But 1 process)
-    multiprocessing.spawn(_work, nprocs=1, args=(args, logger, dataset_train, dataset_val, dataset_train_ulb), join=True)
+    multiprocessing.spawn(_work, nprocs=1, args=(args, dataset_train, dataset_val, dataset_train_ulb), join=True)
     
     logger.info('Done Finetuning.\n')
 
