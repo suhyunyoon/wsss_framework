@@ -5,6 +5,7 @@ log_overwrite: True
 use_tensorboard: True
 distributed_multiprocessing: False
 distributed_backend: nccl
+distributed_url: tcp://127.0.0.1:10010
 dataset: voc12
 dataset_root: ../../dataset/VOC/
 seed: 42
@@ -18,12 +19,13 @@ train:
   input_size: 512
   crop_size: 480
   batch_size: 16
-  epochs: 50 
+  epochs: 50
+  warmup: 25
   loss: 
     name: MultiLabelSoftMarginLoss
     kwargs:
-      reduction: none
-  lambda: 1
+      reduction: mean
+  lambda: 0.05
 eval:
   crop_size: 512
   batch_size: 64

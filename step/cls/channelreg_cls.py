@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 import torch
 from torch import nn, multiprocessing
+import torch.nn.functional as F
 
 # from torchvision.datasets import VOCSegmentation, VOCDetection
 from utils.datasets import voc_train_dataset, voc_val_dataset, voc_test_dataset
@@ -97,7 +98,14 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             logit, features = model(img)            
             loss = class_loss(logit, label).mean()
 
+            # Channel-wise loss
+            if e >= args.train['warmup']:
+                feature = features[-1]
+                feature_pl = torch.max(feature.detach(), dim=1).values
+                feature_pl = feature_pl.unsqueeze(dim=1).repeat(1,feature.size(1),1,1)
+                channel_loss = F.mse_loss(feature, feature_pl)
 
+                loss += args.train['lambda'] * channel_loss
 
             # training
             optimizer.zero_grad()
