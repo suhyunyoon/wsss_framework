@@ -73,20 +73,20 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     for e in range(args.train['epochs']):
         tb_dict = {}
         # Validation
-        # if e % args.verbose_interval == 0:
-        #     val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-        #     logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
-        #     tb_dict['eval/acc'] = val_acc
-        #     tb_dict['eval/precision'] = val_precision
-        #     tb_dict['eval/recall'] = val_recall
-        #     tb_dict['eval/f1'] = val_f1
-        #     tb_dict['eval/map'] = val_map
-        #     # Save Best Model
-        #     if val_acc >= best_acc:
-        #         best_model_path = os.path.join(args.log_path, 'best.pth')
-        #         torch.save(model.module.state_dict(), best_model_path)
-        #         logger.info(f'{best_model_path} Saved.')
-        #         best_acc = val_acc
+        if e % args.verbose_interval == 0:
+            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
+            tb_dict['eval/acc'] = val_acc
+            tb_dict['eval/precision'] = val_precision
+            tb_dict['eval/recall'] = val_recall
+            tb_dict['eval/f1'] = val_f1
+            tb_dict['eval/map'] = val_map
+            # Save Best Model
+            if val_acc >= best_acc:
+                best_model_path = os.path.join(args.log_path, 'best.pth')
+                torch.save(model.module.state_dict(), best_model_path)
+                logger.info(f'{best_model_path} Saved.')
+                best_acc = val_acc
 
         model.train()
 
@@ -123,11 +123,10 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
                 feature = features[-1]
                 feature = ch_pool(feature)
                 feature_dim = tuple(i for i in range(1, len(feature.size())))
-                print(feature.size(), feature_dim)
                 chloss = feature.sum(dim=feature_dim)
 
                 loss += chloss.mean()
-                channel_loss += chloss.detach().cpu()
+                channel_loss += chloss.mean().detach().cpu()
 
             # training
             optimizer.zero_grad()
