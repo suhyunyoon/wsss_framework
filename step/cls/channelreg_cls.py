@@ -19,6 +19,8 @@ from utils.optims import get_cls_optimzier
 from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
+from utils.channelreg_utils import CustomPool2d, get_variance, get_product
+
 # Channel-wise Regularization
 from torchvision.models.feature_extraction import create_feature_extractor
 
@@ -71,23 +73,32 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     for e in range(args.train['epochs']):
         tb_dict = {}
         # Validation
-        if e % args.verbose_interval == 0:
-            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
-            tb_dict['eval/acc'] = val_acc
-            tb_dict['eval/precision'] = val_precision
-            tb_dict['eval/recall'] = val_recall
-            tb_dict['eval/f1'] = val_f1
-            tb_dict['eval/map'] = val_map
-            # Save Best Model
-            if val_acc >= best_acc:
-                best_model_path = os.path.join(args.log_path, 'best.pth')
-                torch.save(model.module.state_dict(), best_model_path)
-                logger.info(f'{best_model_path} Saved.')
-                best_acc = val_acc
+        # if e % args.verbose_interval == 0:
+        #     val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
+        #     logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
+        #     tb_dict['eval/acc'] = val_acc
+        #     tb_dict['eval/precision'] = val_precision
+        #     tb_dict['eval/recall'] = val_recall
+        #     tb_dict['eval/f1'] = val_f1
+        #     tb_dict['eval/map'] = val_map
+        #     # Save Best Model
+        #     if val_acc >= best_acc:
+        #         best_model_path = os.path.join(args.log_path, 'best.pth')
+        #         torch.save(model.module.state_dict(), best_model_path)
+        #         logger.info(f'{best_model_path} Saved.')
+        #         best_acc = val_acc
 
         model.train()
+
+        # Channel-wise regularization
+        if args.train['channelreg'] == 'variance':
+            ch_func = get_variance
+        elif args.train['channelreg'] == 'product':
+            ch_func = get_product
+        ch_pool = CustomPool2d(kernel_size=5, stride=1, padding=0, func=ch_func)
+
         train_loss = 0.
+        cls_loss, channel_loss = 0., 0.
         logits, labels = [], []
         for img, label in tqdm(train_dl):
             # memorize labels
@@ -95,17 +106,28 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             img, label = img.cuda(), label.cuda()
             
             # calc loss
-            logit, features = model(img)            
+            logit, features, cam = model(img)            
             loss = class_loss(logit, label).mean()
+            cls_loss += loss.detach().cpu()
 
             # Channel-wise loss
-            if e >= args.train['warmup']:
-                feature = features[-1]
-                feature_pl = torch.max(feature.detach(), dim=1).values
-                feature_pl = feature_pl.unsqueeze(dim=1).repeat(1,feature.size(1),1,1)
-                channel_loss = F.mse_loss(feature, feature_pl)
+            if e >= args.train['warmup_epochs']:
+            #     Option 1 - Channel Maximization
+            #     feature = features[-1]
+            #     feature_pl = torch.max(feature.detach(), dim=1).values
+            #     feature_pl = feature_pl.unsqueeze(dim=1).repeat(1,feature.size(1),1,1)
+            #     channel_loss = F.mse_loss(feature, feature_pl)
 
-                loss += args.train['lambda'] * channel_loss
+            #     loss += args.train['lambda'] * channel_loss
+                # Option 2
+                feature = features[-1]
+                feature = ch_pool(feature)
+                feature_dim = tuple(i for i in range(1, len(feature.size())))
+                print(feature.size(), feature_dim)
+                chloss = feature.sum(dim=feature_dim)
+
+                loss += chloss.mean()
+                channel_loss += chloss.detach().cpu()
 
             # training
             optimizer.zero_grad()
@@ -120,6 +142,9 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             
         # Training log
         train_loss /= len(dataset_train)
+        cls_loss /= len(dataset_train)
+        channel_loss /= len(dataset_train)
+
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0) 
         
@@ -127,6 +152,9 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
         acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
         logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (e+1, train_loss, map, acc, precision, recall))
         #logger.info(optimizer.state_dict)
+        tb_dict['train/loss'] = train_loss
+        tb_dict['train/classification_loss'] = cls_loss
+        tb_dict['train/channel_loss'] = channel_loss
         tb_dict['train/acc'] = acc
         tb_dict['train/precision'] = precision
         tb_dict['train/recall'] = recall
@@ -158,8 +186,6 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
 
 
 def run(args):
-    logger.info('Training Classifier...')
-
     # Count GPUs
     n_gpus = torch.cuda.device_count()
     logger.info(f'{n_gpus} GPUs Available.')
@@ -189,6 +215,7 @@ def run(args):
     if dataset_train_ulb is not None:
         logger.info(f'Unlabeled Train Dataset Length: {len(dataset_train_ulb)}')
     
+    logger.info('Training Classifier...')
     # Multiprocessing (But 1 process)
     multiprocessing.spawn(_work, nprocs=1, args=(args, dataset_train, dataset_val, dataset_train_ulb), join=True)
     

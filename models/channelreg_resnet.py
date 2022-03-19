@@ -4,6 +4,7 @@ import logging
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
 
 from torch.hub import load_state_dict_from_url
@@ -172,8 +173,13 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        # InstanceNorm(Channel-wise Normalization)
+        #self.layer4[-1].----1111 = nn.GroupNorm(512, 512)
+
+        
+        self.fc = nn.Conv2d(512 * block.expansion, num_classes, kernel_size=1)
+        #nn.Linear(512 * block.expansion, num_classes)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -248,13 +254,14 @@ class ResNet(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
 
-        x = self.avgpool(x4)
-        x = torch.flatten(x, 1)
-        logit = self.fc(x)
+        # Classification
+        cam = self.fc(x4)
+        x = F.avg_pool2d(cam, kernel_size=(cam.size(2), cam.size(3)), padding=0)
+        logit = x.view(-1, 20)
 
         # Get features
         if self.training:
-            return logit, [x1, x2, x3, x4]
+            return logit, [x1, x2, x3, x4], cam
         else:
             return logit
 

@@ -20,11 +20,12 @@ train:
   crop_size: 480
   batch_size: 16
   epochs: 50
-  warmup: 25
+  warmup_epochs: 0
   loss: 
     name: MultiLabelSoftMarginLoss
     kwargs:
       reduction: mean
+  channelreg: variance # production
   lambda: 0.05
 eval:
   crop_size: 512
