@@ -125,7 +125,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
                 feature_dim = tuple(i for i in range(1, len(feature.size())))
                 chloss = feature.sum(dim=feature_dim)
 
-                loss += chloss.mean()
+                loss += args.train['lambda'] * chloss.mean()
                 channel_loss += chloss.mean().detach().cpu()
 
             # training

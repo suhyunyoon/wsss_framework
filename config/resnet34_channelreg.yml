@@ -26,7 +26,7 @@ train:
     kwargs:
       reduction: mean
   channelreg: variance # production
-  lambda: 0.05
+  lambda: 0.1
 eval:
   crop_size: 512
   batch_size: 64
