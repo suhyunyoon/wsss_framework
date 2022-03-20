@@ -66,36 +66,36 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     #model = torch.nn.parallel.DistributedDataParallel(model.cuda())
 
     # Loss (MultiLabelSoftMarginLoss or BCEWithLogitsLoss or etc..)
-    class_loss = getattr(utils.loss, args.train['loss']['name'])(**args.train['loss']['kwargs']).cuda()
+    class_criterion = getattr(utils.loss, args.train['loss']['name'])(**args.train['loss']['kwargs']).cuda()
 
+    # Channel-wise regularization
+    if args.train['channelreg'] == 'variance':
+        ch_func = get_variance
+    elif args.train['channelreg'] == 'product':
+        ch_func = get_product
+    ch_pool = CustomPool2d(kernel_size=5, stride=1, padding=0, func=ch_func)
+    
     # Training 
     best_acc = 0.0
     for e in range(args.train['epochs']):
         tb_dict = {}
         # Validation
         if e % args.verbose_interval == 0:
-            val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
-            tb_dict['eval/acc'] = val_acc
-            tb_dict['eval/precision'] = val_precision
-            tb_dict['eval/recall'] = val_recall
-            tb_dict['eval/f1'] = val_f1
-            tb_dict['eval/map'] = val_map
+            tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
+                                tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
+
             # Save Best Model
-            if val_acc >= best_acc:
+            if tb_dict['eval/acc'] >= best_acc:
                 best_model_path = os.path.join(args.log_path, 'best.pth')
                 torch.save(model.module.state_dict(), best_model_path)
+                best_acc = tb_dict['eval/acc']
+
                 logger.info(f'{best_model_path} Saved.')
-                best_acc = val_acc
+
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
+                        (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
 
         model.train()
-
-        # Channel-wise regularization
-        if args.train['channelreg'] == 'variance':
-            ch_func = get_variance
-        elif args.train['channelreg'] == 'product':
-            ch_func = get_product
-        ch_pool = CustomPool2d(kernel_size=5, stride=1, padding=0, func=ch_func)
 
         train_loss = 0.
         cls_loss, channel_loss = 0., 0.
@@ -107,26 +107,27 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             
             # calc loss
             logit, features, cam = model(img)            
-            loss = class_loss(logit, label).mean()
+            loss = class_criterion(logit, label).mean()
             cls_loss += loss.detach().cpu()
 
             # Channel-wise loss
             if e >= args.train['warmup_epochs']:
-            #     Option 1 - Channel Maximization
-            #     feature = features[-1]
-            #     feature_pl = torch.max(feature.detach(), dim=1).values
-            #     feature_pl = feature_pl.unsqueeze(dim=1).repeat(1,feature.size(1),1,1)
-            #     channel_loss = F.mse_loss(feature, feature_pl)
+                # # Option 1 - Channel Maximization
+                # feature = features[-1]
+                # feature_pl = torch.max(feature.detach(), dim=1).values
+                # feature_pl = feature_pl.unsqueeze(dim=1).repeat(1,feature.size(1),1,1)
+                # ch_loss = F.mse_loss(feature, feature_pl)
 
-            #     loss += args.train['lambda'] * channel_loss
+                # loss += args.train['lambda'] * ch_loss
+                # channel_loss += ch_loss.mean().detach().cpu()
+
                 # Option 2
-                feature = features[-1]
-                feature = ch_pool(feature)
+                feature = ch_pool(features[-1]) # ch_pool(cam)
                 feature_dim = tuple(i for i in range(1, len(feature.size())))
-                chloss = feature.sum(dim=feature_dim)
+                ch_loss = feature.sum(dim=feature_dim).mean()
 
-                loss += args.train['lambda'] * chloss.mean()
-                channel_loss += chloss.mean().detach().cpu()
+                loss += args.train['lambda'] * ch_loss
+                channel_loss += ch_loss.detach().cpu()
 
             # training
             optimizer.zero_grad()
@@ -148,18 +149,14 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
         labels = torch.cat(labels, dim=0) 
         
         # Logging
-        acc, precision, recall, f1, _, map = eval_multilabel_metric(labels, logits, average='samples')
-        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (e+1, train_loss, map, acc, precision, recall))
-        #logger.info(optimizer.state_dict)
+        tb_dict['train/acc'], tb_dict['train/precision'], tb_dict['train/recall'], ap, tb_dict['train/map'] = eval_multilabel_metric(labels, logits, average='samples')
         tb_dict['train/loss'] = train_loss
         tb_dict['train/classification_loss'] = cls_loss
         tb_dict['train/channel_loss'] = channel_loss
-        tb_dict['train/acc'] = acc
-        tb_dict['train/precision'] = precision
-        tb_dict['train/recall'] = recall
-        tb_dict['train/f1'] = f1
-        tb_dict['train/map'] = map
         tb_dict['lr'] = optimizer.param_groups[0]['lr'] # Need modification for other optims except SGDs
+
+        logger.info('Epoch %d Train Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
+                    (e+1, tb_dict['train/loss'], tb_dict['train/map'], tb_dict['train/acc'], tb_dict['train/precision'], tb_dict['train/recall']))
         
         # Update scheduler
         if scheduler is not None:
@@ -169,13 +166,11 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
         tb_logger.update(tb_dict, e)
 
     # Final Validation
-    val_loss, val_acc, val_precision, val_recall, val_f1, val_ap, val_map = validate(model, val_dl, dataset_val, class_loss)
-    logger.info('Final Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % (val_loss, val_map, val_acc, val_precision, val_recall))
-    tb_dict['eval/acc'] = val_acc
-    tb_dict['eval/precision'] = val_precision
-    tb_dict['eval/recall'] = val_recall
-    tb_dict['eval/f1'] = val_f1
-    tb_dict['eval/map'] = val_map
+    tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
+                                tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
+    logger.info('Final Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
+                (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
+    # Logging
     tb_logger.update(tb_dict, args.train['epochs'])
 
     # Save final model (split module from dataparallel)

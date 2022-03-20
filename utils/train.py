@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 
 # Validation in training
-def validate(model, dl, dataset, class_loss):
+def validate(model, dl, dataset, criterion):
     model.eval()
     with torch.no_grad():
         val_loss = 0.
@@ -17,7 +17,7 @@ def validate(model, dl, dataset, class_loss):
             
             # calc loss
             logit = model(img)
-            loss = class_loss(logit, label).mean()
+            loss = criterion(logit, label).mean()
             
             # loss
             val_loss += loss.detach().cpu()
@@ -30,9 +30,9 @@ def validate(model, dl, dataset, class_loss):
         # eval
         logits = torch.cat(logits, dim=0).cpu()
         labels = torch.cat(labels, dim=0)
-        acc, precision, recall, f1, ap, map = eval_multilabel_metric(labels, logits, average='samples')
+        acc, precision, recall, ap, map = eval_multilabel_metric(labels, logits, average='samples')
 
-    return val_loss, acc, precision, recall, f1, ap, map
+    return val_loss, acc, precision, recall, ap, map
 
     
 # Metrics
@@ -78,8 +78,7 @@ def eval_multilabel_metric(label, logit, average="samples"):
     acc = accuracy_score(label, pred) * 100
     precision = precision_score(label, pred, average=average, zero_division=0) * 100
     recall = recall_score(label, pred, average=average) * 100
-    f1 = f1_score(label, pred, average=average) * 100
     ap = AP(label, pred) * 100
     map = ap.mean()
     
-    return acc, precision, recall, f1, ap, map
+    return acc, precision, recall, ap, map
