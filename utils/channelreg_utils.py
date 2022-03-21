@@ -48,7 +48,7 @@ def minmax_scaling(x):
     xmin = x.amin(dim=tuple(i for i in range(2, size_len)), keepdim=True)
     xmax = x.amax(dim=tuple(i for i in range(2, size_len)), keepdim=True)
 
-    return ((x + xmin) / (xmax + xmin))
+    return ((x - xmin) / (xmax - xmin))
 
 def get_variance(x, norm=True):
     if norm:
@@ -58,4 +58,4 @@ def get_variance(x, norm=True):
 def get_product(x, norm=True):
     if norm:
         x = minmax_scaling(x)
-    return x.prod(dim=-1)
+    return x.prod(dim=-1) + 0.0000001

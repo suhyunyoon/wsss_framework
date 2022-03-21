@@ -73,7 +73,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
         ch_func = get_variance
     elif args.train['channelreg'] == 'product':
         ch_func = get_product
-    ch_pool = CustomPool2d(kernel_size=5, stride=1, padding=0, func=ch_func)
+    ch_pool = CustomPool2d(kernel_size=args.train['kernel_size'], stride=args.train['stride'], padding=args.train['padding'], func=ch_func)
     
     # Training 
     best_acc = 0.0
@@ -121,7 +121,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
                 # loss += args.train['lambda'] * ch_loss
                 # channel_loss += ch_loss.mean().detach().cpu()
 
-                # Option 2
+                # Option 2 - stastical pooling
                 feature = ch_pool(features[-1]) # ch_pool(cam)
                 feature_dim = tuple(i for i in range(1, len(feature.size())))
                 ch_loss = feature.sum(dim=feature_dim).mean()
