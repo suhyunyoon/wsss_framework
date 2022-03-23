@@ -58,4 +58,4 @@ def get_variance(x, norm=True):
 def get_product(x, norm=True):
     if norm:
         x = minmax_scaling(x)
-    return x.prod(dim=-1) + 0.0000001
+    return x.prod(dim=-1) + 0.000001

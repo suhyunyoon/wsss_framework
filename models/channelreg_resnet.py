@@ -274,14 +274,19 @@ class ResNet(nn.Module):
         pop_keys = []
         for k in state_dict:
             if k in model_state_dict:
-                if state_dict[k].shape != model_state_dict[k].shape:
+                if state_dict[k].size() != model_state_dict[k].size():
                     logger.warning(f"Parameter size mismatch: {k}, "
                                 f"required shape: {model_state_dict[k].shape}, "
                                 f"loaded shape: {state_dict[k].shape}")
                     if strict:
                         raise RuntimeError
                     else:
-                        pop_keys.append(k)
+                        # load from normal resnet
+                        if k == 'fc.weight' and state_dict[k].size().numel() == model_state_dict[k].size().numel():
+                            state_dict[k] = state_dict[k].unsqueeze(-1).unsqueeze(-1)
+                            logger.warning(f"Reshaping parameter {k}")
+                        else:
+                            pop_keys.append(k)
             else:
                 logger.warning(f"Dropping parameter {k}")
                 if strict:
@@ -290,7 +295,7 @@ class ResNet(nn.Module):
                     pop_keys.append(k)
         for k in pop_keys:
             state_dict.pop(k, None)
-
+        
         self.load_state_dict(state_dict, strict=False)
     
     def get_parameter_groups(self):
