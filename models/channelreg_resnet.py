@@ -262,7 +262,7 @@ class ResNet(nn.Module):
         logit = x.view(-1, 20)
 
         # Get features
-        if self.cam_hook:
+        if self.cam_hook or self.training:
             return logit, [x1, x2, x3, x4], cam
         else:
             return logit
