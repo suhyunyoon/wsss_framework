@@ -145,12 +145,14 @@ class ResNet(nn.Module):
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
+        cam_hook: bool = False
     ) -> None:
         super().__init__()
         #_log_api_usage_once(self)
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
+        self.cam_hook = cam_hook
 
         self.inplanes = 64
         self.dilation = 1
@@ -260,7 +262,7 @@ class ResNet(nn.Module):
         logit = x.view(-1, 20)
 
         # Get features
-        if self.training:
+        if self.cam_hook:
             return logit, [x1, x2, x3, x4], cam
         else:
             return logit
