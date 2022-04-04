@@ -19,7 +19,7 @@ from utils.optims import get_cls_optimzier
 from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
-from utils.channelreg_utils import CustomPool2d, get_variance, get_product
+from utils.channelreg_utils import CustomPool2d, get_variance, get_product, get_l1, get_l2
 
 # Channel-wise Regularization
 from torchvision.models.feature_extraction import create_feature_extractor
@@ -73,6 +73,10 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
         ch_func = get_variance
     elif args.train['channelreg'] == 'product':
         ch_func = get_product
+    elif args.train['channelreg'] == 'l1':
+        ch_func = get_l1
+    elif args.train['channelreg'] == 'l2':
+        ch_func = get_l2
     ch_pool = CustomPool2d(kernel_size=args.train['kernel_size'], stride=args.train['stride'], padding=args.train['padding'], func=ch_func)
     
     # Training 

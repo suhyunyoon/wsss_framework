@@ -59,3 +59,13 @@ def get_product(x, norm=True):
     if norm:
         x = minmax_scaling(x)
     return x.prod(dim=-1) + 0.000001
+
+def get_l1(x, norm=False):
+    if norm:
+        x = minmax_scaling(x)
+    return x.abs().sum()
+
+def get_l2(x, norm=False):
+    if norm:
+        x = minmax_scaling(x)
+    return x.pow(2.0).sum()
