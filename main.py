@@ -69,7 +69,7 @@ if __name__ == '__main__':
     
     # Step
     parser.add_argument("--cls_skip", action="store_true")
-    parser.add_argument("--gen_pl_skip", action="store_true")
+    parser.add_argument("--gen_pl_skip", default=True, action="store_true")
     parser.add_argument("--gen_cam_skip", action="store_true")
     parser.add_argument("--eval_cam_skip", action="store_true")
     #parser.add_argument("--save_cam", action="store_true",

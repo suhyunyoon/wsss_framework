@@ -19,7 +19,7 @@ from utils.optims import get_cls_optimzier
 from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
-from utils.channelreg_utils import CustomPool2d, get_variance, get_product, get_l1, get_l2
+from utils.channelreg_utils import CustomPool2d, get_variance, get_product, get_l1, get_l2, Orthogonality
 
 # Channel-wise Regularization
 from torchvision.models.feature_extraction import create_feature_extractor
@@ -69,16 +69,20 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     class_criterion = getattr(utils.loss, args.train['loss']['name'])(**args.train['loss']['kwargs']).cuda()
 
     # Channel-wise regularization
-    if args.train['channelreg'] == 'variance':
-        ch_func = get_variance
-    elif args.train['channelreg'] == 'product':
-        ch_func = get_product
-    elif args.train['channelreg'] == 'l1':
-        ch_func = get_l1
-    elif args.train['channelreg'] == 'l2':
-        ch_func = get_l2
-    ch_pool = CustomPool2d(kernel_size=args.train['kernel_size'], stride=args.train['stride'], padding=args.train['padding'], func=ch_func)
-    
+    if args.train['channelreg']['type'] == 'orthogonal':
+        channelreg = Orthogonality(args.train['channelreg']['target'], symmetric=args.train['channelreg']['symmetric'])
+    else:
+        if args.train['channelreg']['type'] == 'variance_pool':
+            ch_func = get_variance
+        elif args.train['channelreg']['type'] == 'product_pool':
+            ch_func = get_product
+        elif args.train['channelreg']['type'] == 'l1':
+            ch_func = get_l1
+        elif args.train['channelreg']['type'] == 'l2':
+            ch_func = get_l2
+        channelreg = CustomPool2d(kernel_size=args.train['channelreg']['kernel_size'], stride=args.train['channelreg']['stride'], 
+                                  padding=args.train['channelreg']['padding'], func=ch_func, get_loss=True)
+
     # Training 
     best_acc = 0.0
     for e in range(args.train['epochs']):
@@ -115,7 +119,15 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             cls_loss += loss.detach().cpu()
 
             # Channel-wise loss
-            if e >= args.train['warmup_epochs']:
+            if e >= args.train['channelreg']['warmup_epochs']:
+                
+                if args.train['channelreg']['lambda'] == 'last':
+                    features = features[-1:]
+                elif args.train['channelreg']['lambda'] == 'first':
+                    features = features[:1]
+                if args.train['channelreg']['layers'] == 'all':
+                    pass
+
                 # # Option 1 - Channel Maximization
                 # feature = features[-1]
                 # feature_pl = torch.max(feature.detach(), dim=1).values
@@ -126,11 +138,13 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
                 # channel_loss += ch_loss.mean().detach().cpu()
 
                 # Option 2 - stastical pooling
-                feature = ch_pool(features[-1]) # ch_pool(cam)
-                feature_dim = tuple(i for i in range(1, len(feature.size())))
-                ch_loss = feature.sum(dim=feature_dim).mean()
+                # Option 3 - Feature Orthogonality(Channel-wise)
+                ch_loss = 0.
+                # Calculate each features
+                for f in features:
+                    ch_loss += channelreg(f).mean() # channelreg(cam)
 
-                loss += args.train['lambda'] * ch_loss
+                loss += args.train['channelreg']['lambda'] * ch_loss
                 channel_loss += ch_loss.detach().cpu()
 
             # training
