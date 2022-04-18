@@ -70,7 +70,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
 
     # Channel-wise regularization
     if args.train['channelreg']['type'] == 'orthogonal':
-        channelreg = Orthogonality(args.train['channelreg']['target'], symmetric=args.train['channelreg']['symmetric'])
+        channelreg = Orthogonality(**args.train['channelreg']['kwargs'])
     else:
         if args.train['channelreg']['type'] == 'variance_pool':
             ch_func = get_variance
@@ -121,9 +121,9 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             # Channel-wise loss
             if e >= args.train['channelreg']['warmup_epochs']:
                 
-                if args.train['channelreg']['lambda'] == 'last':
+                if args.train['channelreg']['layers'] == 'last':
                     features = features[-1:]
-                elif args.train['channelreg']['lambda'] == 'first':
+                elif args.train['channelreg']['layers'] == 'first':
                     features = features[:1]
                 if args.train['channelreg']['layers'] == 'all':
                     pass

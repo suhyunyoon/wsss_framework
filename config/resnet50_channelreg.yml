@@ -26,10 +26,11 @@ train:
       reduction: none
   channelreg:
     type: orthogonal # l1 l2 variance product
-    target: channel #spatial
-    sort_by: mean # max
-    k: 128
-    #symmetric: False # True
+    kwargs:
+      target: channel #spatial
+      sort_by: mean # max
+      k: 128
+      #symmetric: False # True
     layers: last #all, first
     warmup_epochs: 0
     lambda: 0.01

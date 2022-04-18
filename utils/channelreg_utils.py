@@ -73,7 +73,7 @@ class Orthogonality(nn.Module):
     def forward(self, x):
         x = x.flatten(2)
         x = minmax_scaling(x, start_dim=1)
-
+        
         # 상위 K개의 element(channel 혹은 pixel representation) 사용
         # Sort by mean
         if self.sort_by == 'mean':
@@ -83,9 +83,12 @@ class Orthogonality(nn.Module):
         elif self.sort_by == 'max':
             x_sorted = x.max(dim=-1).values
             x_idx = torch.argsort(x_sorted, dim=-1, descending=True)
-        # 상위 K개
-        x_ = x[:,x_idx[:self.k]]
-
+        
+        # 상위 K개 index
+        x_idx = x_idx[:,:self.k].unsqueeze(dim=-1).repeat(1,1,x.size(-1))
+        # 상위 K개 추출
+        x_ = torch.gather(x, 1, x_idx)
+        
         # pixel 별 representation이 orthogonal 하도록(USELESS)
         if self.target == 'spatial':
             reg = self.get_orth_reg(x_)
@@ -96,7 +99,7 @@ class Orthogonality(nn.Module):
 
         # if self.symmetric:
         #     reg += self.get_orth_reg(x.transpose(-1,-2))
-            
+        
         return reg
 
 
