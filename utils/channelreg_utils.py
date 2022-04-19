@@ -142,10 +142,8 @@ def get_feature_orthogonality(feat):
 def get_spatialreg(x):
     # reverse mean(?) CAM
     reg = 1. / (x.mean(dim=(1,2,3)) + 1.0e-06) # relu 미리 적용해야하나?
-    print(reg)
     # variance non-zero
     for i, c in enumerate(x):
         std_reg = c[torch.where(c > 0)].std(unbiased=False)
         reg[i] += torch.nan_to_num(std_reg, nan=0., posinf=0., neginf=0.)
-    print(reg)
     return reg
