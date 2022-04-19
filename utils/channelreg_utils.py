@@ -64,7 +64,7 @@ class Orthogonality(nn.Module):
     def get_orth_reg(self, x):
         x = minmax_scaling(x, start_dim=1)
         # Orthogonality
-        reg = x.transpose(-1,-2) @ x
+        reg = x @ x.transpose(-1,-2) 
         # Norm
         #return LA.norm(reg - torch.eye(reg.size(1), device=reg.device), dim=(1,2)) # Frobenius(L2) norm
         reg = reg - reg.detach().diagonal(dim1=-2, dim2=-1).diag_embed()
@@ -91,11 +91,11 @@ class Orthogonality(nn.Module):
         
         # pixel 별 representation이 orthogonal 하도록(USELESS)
         if self.target == 'spatial':
-            reg = self.get_orth_reg(x_)
+            reg = self.get_orth_reg(x_.transpose(-1,-2))
 
         # Channel 별 feature map이 orthogonal 하도록(다른 영역을 보도록)
         elif self.target == 'channel':
-            reg = self.get_orth_reg(x_.transpose(-1,-2))
+            reg = self.get_orth_reg(x_)
 
         # if self.symmetric:
         #     reg += self.get_orth_reg(x.transpose(-1,-2))
@@ -120,7 +120,7 @@ def get_variance(x, norm=True):
 def get_product(x, norm=True):
     if norm:
         x = minmax_scaling(x)
-    return x.prod(dim=-1) + 0.000001
+    return x.prod(dim=-1) + 1.0e-06
 
 def get_l1(x, norm=True):
     if norm:
@@ -136,3 +136,16 @@ def get_l2(x, norm=True):
 def get_feature_orthogonality(feat):
 
     return feat
+
+
+# Spatial regularization
+def get_spatialreg(x):
+    # reverse mean(?) CAM
+    reg = 1. / (x.mean(dim=(1,2,3)) + 1.0e-06) # relu 미리 적용해야하나?
+    print(reg)
+    # variance non-zero
+    for i, c in enumerate(x):
+        std_reg = c[torch.where(c > 0)].std(unbiased=False)
+        reg[i] += torch.nan_to_num(std_reg, nan=0., posinf=0., neginf=0.)
+    print(reg)
+    return reg

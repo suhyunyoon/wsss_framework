@@ -1,5 +1,5 @@
 network: creg_resnet50
-log_name: resnet50_channelreg_voc12_1_orthogonal_0.001_last
+log_name: resnet50_channelreg_voc12_1_orthogonal_0.01_cam
 log_dir: ./result
 log_overwrite: True
 use_tensorboard: True
@@ -25,18 +25,19 @@ train:
     kwargs:
       reduction: none
   channelreg:
-    type: orthogonal # l1 l2 variance product
+    type: camreg #orthogonal # l1 l2 variance product
     kwargs:
       target: channel #spatial
       sort_by: mean # max
       k: 128
       #symmetric: False # True
-    layers: last #all, first
+    layers: cam #last # all, first
     warmup_epochs: 0
-    lambda: 0.01
-    #kernel_size: 15
-    #stride: 1
-    #padding: 0
+    lambda: 0.0001
+    # kwargs:
+    #   kernel_size: 15
+    #   stride: 1
+    #   padding: 0
 eval:
   crop_size: 480
   batch_size: 64

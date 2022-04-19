@@ -19,7 +19,7 @@ from utils.optims import get_cls_optimzier
 from utils.misc import TensorBoardLogger, make_logger
 from utils.train import validate, eval_multilabel_metric
 
-from utils.channelreg_utils import CustomPool2d, get_variance, get_product, get_l1, get_l2, Orthogonality
+from utils.channelreg_utils import CustomPool2d, get_variance, get_product, get_l1, get_l2, Orthogonality, get_spatialreg
 
 # Channel-wise Regularization
 from torchvision.models.feature_extraction import create_feature_extractor
@@ -71,6 +71,8 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     # Channel-wise regularization
     if args.train['channelreg']['type'] == 'orthogonal':
         channelreg = Orthogonality(**args.train['channelreg']['kwargs'])
+    elif args.train['channelreg']['type'] == 'camreg':
+        channelreg = get_spatialreg
     else:
         if args.train['channelreg']['type'] == 'variance_pool':
             ch_func = get_variance
@@ -80,28 +82,27 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             ch_func = get_l1
         elif args.train['channelreg']['type'] == 'l2':
             ch_func = get_l2
-        channelreg = CustomPool2d(kernel_size=args.train['channelreg']['kernel_size'], stride=args.train['channelreg']['stride'], 
-                                  padding=args.train['channelreg']['padding'], func=ch_func, get_loss=True)
+        channelreg = CustomPool2d(**args.train['channelreg']['kwargs'], func=ch_func, get_loss=True)
 
     # Training 
     best_acc = 0.0
     for e in range(args.train['epochs']):
         tb_dict = {}
         # Validation
-        if e % args.verbose_interval == 0:
-            tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
-                                tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
+        # if e % args.verbose_interval == 0:
+        #     tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
+        #                         tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
 
-            # Save Best Model
-            if tb_dict['eval/acc'] >= best_acc:
-                best_model_path = os.path.join(args.log_path, 'best.pth')
-                torch.save(model.module.state_dict(), best_model_path)
-                best_acc = tb_dict['eval/acc']
+        #     # Save Best Model
+        #     if tb_dict['eval/acc'] >= best_acc:
+        #         best_model_path = os.path.join(args.log_path, 'best.pth')
+        #         torch.save(model.module.state_dict(), best_model_path)
+        #         best_acc = tb_dict['eval/acc']
 
-                logger.info(f'{best_model_path} Saved.')
+        #         logger.info(f'{best_model_path} Saved.')
 
-            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
-                        (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
+        #     logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
+        #                 (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
 
         model.train()
 
@@ -117,17 +118,21 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
             logit, features, cam = model(img)            
             loss = class_criterion(logit, label).mean()
             cls_loss += loss.detach().cpu()
-
-            # Channel-wise loss
+            
+            # Regularization loss
             if e >= args.train['channelreg']['warmup_epochs']:
                 
                 if args.train['channelreg']['layers'] == 'last':
                     features = features[-1:]
                 elif args.train['channelreg']['layers'] == 'first':
                     features = features[:1]
-                if args.train['channelreg']['layers'] == 'all':
+                elif args.train['channelreg']['layers'] == 'all':
                     pass
-
+                elif args.train['channelreg']['layers'] == 'cam':
+                    # use labeled cam
+                    mask = label.view(-1,args.voc_class_num-1,1,1)
+                    features = [cam * mask]
+                
                 # # Option 1 - Channel Maximization
                 # feature = features[-1]
                 # feature_pl = torch.max(feature.detach(), dim=1).values
@@ -139,6 +144,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
 
                 # Option 2 - stastical pooling
                 # Option 3 - Feature Orthogonality(Channel-wise)
+                # Option 4 - CAM Regularization(wider)
                 ch_loss = 0.
                 # Calculate each features
                 for f in features:
