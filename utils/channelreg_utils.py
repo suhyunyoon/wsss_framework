@@ -104,7 +104,7 @@ class Orthogonality(nn.Module):
 
 
 # 0-1 MinMax scaling
-def minmax_scaling(x, start_dim=2):
+def minmax_scaling(x, start_dim=1):
     end_dim = len(x.size())
     xmin = x.amin(dim=tuple(i for i in range(start_dim, end_dim)), keepdim=True)
     xmax = x.amax(dim=tuple(i for i in range(start_dim, end_dim)), keepdim=True)
@@ -139,7 +139,9 @@ def get_feature_orthogonality(feat):
 
 
 # Spatial regularization
-def get_spatialreg(x):
+def get_spatialreg(x, norm=True):
+    if norm:
+        x = minmax_scaling(x)
     # reverse mean(?) CAM
     reg = 1. / (x.mean(dim=(1,2,3)) + 1.0e-06) # relu 미리 적용해야하나?
     # variance non-zero

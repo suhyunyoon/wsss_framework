@@ -88,21 +88,21 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     best_acc = 0.0
     for e in range(args.train['epochs']):
         tb_dict = {}
-        # Validation
-        # if e % args.verbose_interval == 0:
-        #     tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
-        #                         tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
+        Validation
+        if e % args.verbose_interval == 0:
+            tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
+                                tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)
 
-        #     # Save Best Model
-        #     if tb_dict['eval/acc'] >= best_acc:
-        #         best_model_path = os.path.join(args.log_path, 'best.pth')
-        #         torch.save(model.module.state_dict(), best_model_path)
-        #         best_acc = tb_dict['eval/acc']
+            # Save Best Model
+            if tb_dict['eval/acc'] >= best_acc:
+                best_model_path = os.path.join(args.log_path, 'best.pth')
+                torch.save(model.module.state_dict(), best_model_path)
+                best_acc = tb_dict['eval/acc']
 
-        #         logger.info(f'{best_model_path} Saved.')
+                logger.info(f'{best_model_path} Saved.')
 
-        #     logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
-        #                 (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
+            logger.info('Validation Loss: %.6f, mAP: %.2f, Accuracy: %.2f, Precision: %.2f, Recall: %.2f' % 
+                        (tb_dict['eval/loss'], tb_dict['eval/map'], tb_dict['eval/acc'], tb_dict['eval/precision'], tb_dict['eval/recall']))
 
         model.train()
 
