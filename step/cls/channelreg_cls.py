@@ -88,7 +88,7 @@ def _work(pid, args, dataset_train, dataset_val, dataset_train_ulb):
     best_acc = 0.0
     for e in range(args.train['epochs']):
         tb_dict = {}
-        Validation
+        # Validation
         if e % args.verbose_interval == 0:
             tb_dict['eval/loss'], tb_dict['eval/acc'], tb_dict['eval/precision'], \
                                 tb_dict['eval/recall'], val_ap, tb_dict['eval/map'] = validate(model, val_dl, dataset_val, class_criterion)

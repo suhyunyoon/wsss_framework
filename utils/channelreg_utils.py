@@ -134,7 +134,7 @@ def get_l2(x, norm=True):
 
 # Feature orthogonality
 def get_feature_orthogonality(feat):
-
+    ##################
     return feat
 
 
@@ -143,9 +143,11 @@ def get_spatialreg(x, norm=True):
     if norm:
         x = minmax_scaling(x)
     # reverse mean(?) CAM
-    reg = 1. / (x.mean(dim=(1,2,3)) + 1.0e-06) # relu 미리 적용해야하나?
+    #reg = 1. / (x.mean(dim=(1,2,3)) + 1.0e-06) # relu 미리 적용해야하나?
+    reg = 1. / (LA.norm(x, dim=(1,2,3)) + 1.0e-06)   # relu 미리 적용해야하나?
     # variance non-zero
     for i, c in enumerate(x):
         std_reg = c[torch.where(c > 0)].std(unbiased=False)
+        # remove nan
         reg[i] += torch.nan_to_num(std_reg, nan=0., posinf=0., neginf=0.)
     return reg

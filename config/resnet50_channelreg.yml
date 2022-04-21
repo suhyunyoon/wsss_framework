@@ -33,7 +33,7 @@ train:
       #symmetric: False # True
     layers: cam #last # all, first
     warmup_epochs: 0
-    lambda: 0.0001
+    lambda: 0.01
     # kwargs:
     #   kernel_size: 15
     #   stride: 1
