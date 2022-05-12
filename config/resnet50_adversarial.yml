@@ -14,6 +14,7 @@ train_list: ./data/voc12/train_aug.txt
 train_ulb_list: False
 eval_list: ./data/voc12/val.txt
 verbose_interval: 3
+alg: adversarial
 train:
   input_size: 512
   crop_size: 480
@@ -23,6 +24,9 @@ train:
     name: MultiLabelSoftMarginLoss
     kwargs:
       reduction: none
+  adversarial:
+    warmup_epochs: 0
+    #lambda: 0.01
 eval:
   crop_size: 480
   batch_size: 64
@@ -43,4 +47,4 @@ optim:
     momentum: 0.9
     weight_decay: 0.0005
     # (N(dataset) // batch_size) * epochs
-    max_step: 33100
+    max_step: 20000
