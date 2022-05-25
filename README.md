@@ -1,2 +1,2 @@
 # Weakly-supervised Semantic Segmentation Framework
-Developing(미완성)
+Under development(미완성)
